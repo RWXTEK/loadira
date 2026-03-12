@@ -17,10 +17,14 @@ import {
 } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
-import { mockCarrier, getSafetyRatingColor, formatCurrency } from '../lib/mockFmcsa'
+import { useAuth } from '../hooks/useAuth'
+import { buildCarrierDisplay, getSafetyRatingColor, formatCurrency } from '../lib/mockFmcsa'
 
 function Dashboard() {
-  const carrier = mockCarrier
+  const { tenant, fmcsaData } = useAuth()
+
+  const carrier = buildCarrierDisplay(tenant, fmcsaData)
+
   const rating = getSafetyRatingColor(carrier.safetyRating)
 
   const safetyScore = Math.round(
@@ -31,7 +35,7 @@ function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white flex flex-col">
-      <Navbar authenticated />
+      <Navbar />
 
       <main className="flex-1 max-w-7xl mx-auto w-full px-6 py-8">
         {/* Header */}

@@ -14,28 +14,51 @@ import {
 } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
-import { mockCarrier } from '../lib/mockFmcsa'
+import { useAuth } from '../hooks/useAuth'
+import { supabase } from '../lib/supabase'
 
 function Settings() {
-  const carrier = mockCarrier
+  const { tenant, settings, refreshTenant } = useAuth()
 
-  const [companyDescription, setCompanyDescription] = useState(carrier.companyDescription)
-  const [brandColor, setBrandColor] = useState(carrier.brandColor)
-  const [serviceLanes, setServiceLanes] = useState(carrier.serviceLanes)
-  const [newLane, setNewLane] = useState('')
+  const [heroText, setHeroText] = useState(settings?.hero_text || '')
+  const [primaryColor, setPrimaryColor] = useState(settings?.primary_color || '#FF6B35')
+  const [logoUrl] = useState(settings?.logo_url || '')
   const [isSaving, setIsSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 
   const [documents, setDocuments] = useState<{ name: string; type: string; date: string }[]>([
-    { name: 'W9-LoneStarExpress.pdf', type: 'W-9 Form', date: '2024-12-01' },
+    { name: 'W9-Form.pdf', type: 'W-9 Form', date: '2024-12-01' },
     { name: 'COI-2025.pdf', type: 'Certificate of Insurance', date: '2025-01-15' },
     { name: 'CarrierAgreement.pdf', type: 'Carrier Agreement', date: '2025-02-10' },
   ])
 
+  // Service lanes stored as hero_text for now (website_settings doesn't have a lanes column)
+  const [serviceLanes, setServiceLanes] = useState<string[]>([])
+  const [newLane, setNewLane] = useState('')
+
   const handleSave = async () => {
     setIsSaving(true)
     setSaved(false)
-    await new Promise((resolve) => setTimeout(resolve, 1500))
+
+    if (tenant && settings) {
+      await supabase
+        .from('website_settings')
+        .update({
+          primary_color: primaryColor,
+          hero_text: heroText,
+        })
+        .eq('id', settings.id)
+    } else if (tenant) {
+      // No settings row yet — create one
+      await supabase.from('website_settings').insert({
+        tenant_id: tenant.id,
+        primary_color: primaryColor,
+        hero_text: heroText,
+        theme: 'dark',
+      })
+    }
+
+    await refreshTenant()
     setIsSaving(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 3000)
@@ -58,7 +81,7 @@ function Settings() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white flex flex-col">
-      <Navbar authenticated />
+      <Navbar />
 
       <main className="flex-1 max-w-4xl mx-auto w-full px-6 py-8">
         {/* Header */}
@@ -100,8 +123,8 @@ function Settings() {
           >
             <div className="flex items-center gap-6">
               <div className="w-24 h-24 bg-gray-800 border-2 border-dashed border-gray-700 rounded-2xl flex items-center justify-center">
-                {carrier.logoUrl ? (
-                  <img src={carrier.logoUrl} alt="Logo" className="w-full h-full object-contain rounded-2xl" />
+                {logoUrl ? (
+                  <img src={logoUrl} alt="Logo" className="w-full h-full object-contain rounded-2xl" />
                 ) : (
                   <Image className="w-8 h-8 text-gray-600" />
                 )}
@@ -128,9 +151,9 @@ function Settings() {
                   (color) => (
                     <button
                       key={color}
-                      onClick={() => setBrandColor(color)}
+                      onClick={() => setPrimaryColor(color)}
                       className={`w-10 h-10 rounded-xl transition-all cursor-pointer ${
-                        brandColor === color ? 'ring-2 ring-white ring-offset-2 ring-offset-gray-950 scale-110' : 'hover:scale-105'
+                        primaryColor === color ? 'ring-2 ring-white ring-offset-2 ring-offset-gray-950 scale-110' : 'hover:scale-105'
                       }`}
                       style={{ backgroundColor: color }}
                     />
@@ -140,27 +163,27 @@ function Settings() {
               <div className="flex items-center gap-2 ml-4">
                 <input
                   type="text"
-                  value={brandColor}
-                  onChange={(e) => setBrandColor(e.target.value)}
+                  value={primaryColor}
+                  onChange={(e) => setPrimaryColor(e.target.value)}
                   className="w-28 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white font-mono focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                 />
               </div>
             </div>
           </SettingsSection>
 
-          {/* Company Description */}
+          {/* Company Description / Hero Text */}
           <SettingsSection
             icon={<FileText className="w-5 h-5" />}
             title="Company Description"
             description="Describe your company, services, and what sets you apart."
           >
             <textarea
-              value={companyDescription}
-              onChange={(e) => setCompanyDescription(e.target.value)}
+              value={heroText}
+              onChange={(e) => setHeroText(e.target.value)}
               rows={5}
               className="w-full px-4 py-3.5 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all resize-none"
             />
-            <p className="text-xs text-gray-500 mt-2">{companyDescription.length} / 1000 characters</p>
+            <p className="text-xs text-gray-500 mt-2">{heroText.length} / 1000 characters</p>
           </SettingsSection>
 
           {/* Service Lanes */}

@@ -1,32 +1,29 @@
 import { useState, useEffect } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import { Shield, Truck, Eye, EyeOff, ArrowRight, CheckCircle, Loader2 } from 'lucide-react'
+import { useAuth } from '../hooks/useAuth'
+import { supabase } from '../lib/supabase'
+import { lookupByMcNumber } from '../lib/fmcsaApi'
+import type { FmcsaCarrier } from '../lib/fmcsaApi'
 
 type Step = 'mc' | 'account' | 'confirm'
 
-interface CarrierPreview {
-  legalName: string
-  dbaName: string
-  dotNumber: string
-  address: string
-  totalDrivers: number
-  totalPowerUnits: number
-  entityType: string
-}
-
 function Signup() {
   const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
+  const { signUp } = useAuth()
   const [step, setStep] = useState<Step>('mc')
   const [mcNumber, setMcNumber] = useState(searchParams.get('mc') || '')
   const [isLookingUp, setIsLookingUp] = useState(false)
   const [lookupError, setLookupError] = useState('')
-  const [carrier, setCarrier] = useState<CarrierPreview | null>(null)
+  const [fmcsaResult, setFmcsaResult] = useState<FmcsaCarrier | null>(null)
 
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [signupError, setSignupError] = useState('')
   const [agreedToTerms, setAgreedToTerms] = useState(false)
 
   // Auto-lookup if MC number came from landing page
@@ -43,23 +40,12 @@ function Signup() {
     setIsLookingUp(true)
     setLookupError('')
 
-    // TODO: Replace with real FMCSA API call via Supabase Edge Function
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-
-      // Mock carrier data for development
-      setCarrier({
-        legalName: 'DEMO TRUCKING LLC',
-        dbaName: 'Demo Freight',
-        dotNumber: '1234567',
-        address: 'Dallas, TX 75201',
-        totalDrivers: 12,
-        totalPowerUnits: 8,
-        entityType: 'CARRIER',
-      })
+      const data = await lookupByMcNumber(mcNumber.trim())
+      setFmcsaResult(data)
       setStep('account')
     } catch {
-      setLookupError('Unable to find carrier with that MC number. Please check and try again.')
+      setLookupError('Carrier not found. Please check your MC number and try again.')
     } finally {
       setIsLookingUp(false)
     }
@@ -67,19 +53,76 @@ function Signup() {
 
   const handleCreateAccount = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!agreedToTerms) return
+    if (!agreedToTerms || !fmcsaResult) return
 
     setIsSubmitting(true)
+    setSignupError('')
 
-    // TODO: Replace with Supabase Auth signup
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-      setStep('confirm')
-    } catch {
-      // Handle error
-    } finally {
+    // 1. Create the auth account
+    const { error, userId, hasSession } = await signUp(email, password, fullName)
+
+    if (error) {
+      setSignupError(error)
       setIsSubmitting(false)
+      return
     }
+
+    // 2. If we have a session (email confirm disabled), create DB rows
+    if (userId && hasSession) {
+      const slug = fmcsaResult.legalName
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '')
+
+      // Create tenant
+      const { data: tenantRow, error: tenantError } = await supabase
+        .from('tenants')
+        .insert({
+          user_id: userId,
+          mc_number: mcNumber.trim(),
+          dot_number: fmcsaResult.dotNumber,
+          legal_name: fmcsaResult.legalName,
+          dba_name: fmcsaResult.dbaName || null,
+          slug,
+        })
+        .select()
+        .single()
+
+      if (tenantError) {
+        setSignupError(tenantError.message)
+        setIsSubmitting(false)
+        return
+      }
+
+      if (tenantRow) {
+        // Create fmcsa_data and website_settings in parallel
+        await Promise.all([
+          supabase.from('fmcsa_data').insert({
+            tenant_id: tenantRow.id,
+            operating_status: fmcsaResult.operatingStatus,
+            safety_rating: fmcsaResult.safetyRating,
+            operation_type: fmcsaResult.entityType,
+            physical_address: fmcsaResult.physicalAddress,
+            phone: fmcsaResult.phone,
+            power_units: fmcsaResult.powerUnits,
+            drivers: fmcsaResult.drivers,
+            insurance_data: fmcsaResult.insuranceData,
+            boc3_on_file: fmcsaResult.boc3OnFile,
+            cargo_carried: fmcsaResult.cargoCarried,
+            basics_scores: fmcsaResult.basicsScores,
+            last_fmcsa_sync: new Date().toISOString(),
+          }),
+          supabase.from('website_settings').insert({
+            tenant_id: tenantRow.id,
+            primary_color: '#FF6B35',
+            theme: 'dark',
+          }),
+        ])
+      }
+    }
+
+    setIsSubmitting(false)
+    setStep('confirm')
   }
 
   return (
@@ -176,16 +219,16 @@ function Signup() {
           {step === 'account' && (
             <div>
               {/* Carrier Preview Card */}
-              {carrier && (
+              {fmcsaResult && (
                 <div className="bg-orange-500/5 border border-orange-500/20 rounded-2xl p-6 mb-6">
                   <div className="flex items-start justify-between">
                     <div>
                       <p className="text-xs text-orange-400 font-medium uppercase tracking-wider mb-1">
                         Carrier Found
                       </p>
-                      <h2 className="text-xl font-bold">{carrier.legalName}</h2>
-                      {carrier.dbaName && (
-                        <p className="text-gray-400 text-sm">DBA: {carrier.dbaName}</p>
+                      <h2 className="text-xl font-bold">{fmcsaResult.legalName}</h2>
+                      {fmcsaResult.dbaName && (
+                        <p className="text-gray-400 text-sm">DBA: {fmcsaResult.dbaName}</p>
                       )}
                     </div>
                     <CheckCircle className="w-6 h-6 text-orange-500 flex-shrink-0" />
@@ -197,17 +240,17 @@ function Signup() {
                     </div>
                     <div>
                       <p className="text-xs text-gray-500">DOT Number</p>
-                      <p className="font-medium">{carrier.dotNumber}</p>
+                      <p className="font-medium">{fmcsaResult.dotNumber}</p>
                     </div>
                     <div>
                       <p className="text-xs text-gray-500">Power Units</p>
-                      <p className="font-medium">{carrier.totalPowerUnits}</p>
+                      <p className="font-medium">{fmcsaResult.powerUnits}</p>
                     </div>
                   </div>
                   <button
                     onClick={() => {
                       setStep('mc')
-                      setCarrier(null)
+                      setFmcsaResult(null)
                     }}
                     className="text-xs text-orange-400 hover:text-orange-300 mt-3 cursor-pointer"
                   >
@@ -220,6 +263,12 @@ function Signup() {
               <div className="bg-gray-900/50 border border-gray-800 rounded-2xl p-8">
                 <h1 className="text-2xl font-bold mb-2">Create your account</h1>
                 <p className="text-gray-400 mb-8">Set up your login to manage your carrier site.</p>
+
+                {signupError && (
+                  <div className="bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl px-4 py-3 text-sm mb-6">
+                    {signupError}
+                  </div>
+                )}
 
                 <form onSubmit={handleCreateAccount} className="space-y-5">
                   <div>
@@ -333,11 +382,11 @@ function Signup() {
                 Check your email at <span className="text-white">{email}</span> to verify your account.
               </p>
 
-              {carrier && (
+              {fmcsaResult && (
                 <div className="bg-gray-800/50 rounded-xl p-5 mb-8 text-left">
                   <h3 className="font-semibold mb-3">What's being set up:</h3>
                   <ul className="space-y-2.5">
-                    <ConfirmItem text={`Professional website for ${carrier.legalName}`} />
+                    <ConfirmItem text={`Professional website for ${fmcsaResult.legalName}`} />
                     <ConfirmItem text="Carrier profile with your FMCSA data" />
                     <ConfirmItem text="Downloadable broker packet PDF" />
                     <ConfirmItem text="Shareable public profile link" />
@@ -345,13 +394,13 @@ function Signup() {
                 </div>
               )}
 
-              <Link
-                to="/dashboard"
-                className="inline-flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold px-8 py-3.5 rounded-xl transition-all"
+              <button
+                onClick={() => navigate('/dashboard')}
+                className="inline-flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold px-8 py-3.5 rounded-xl transition-all cursor-pointer"
               >
                 Go to My Dashboard
                 <ArrowRight className="w-5 h-5" />
-              </Link>
+              </button>
             </div>
           )}
         </div>

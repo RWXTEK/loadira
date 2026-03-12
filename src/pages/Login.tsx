@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Shield, Eye, EyeOff, ArrowRight, Loader2 } from 'lucide-react'
+import { useAuth } from '../hooks/useAuth'
 
 function Login() {
   const [email, setEmail] = useState('')
@@ -8,20 +9,20 @@ function Login() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+  const { signIn } = useAuth()
+  const navigate = useNavigate()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setError('')
 
-    // TODO: Replace with Supabase Auth login
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-      window.location.href = '/dashboard'
-    } catch {
-      setError('Invalid email or password. Please try again.')
-    } finally {
+    const { error } = await signIn(email, password)
+    if (error) {
+      setError(error)
       setIsLoading(false)
+    } else {
+      navigate('/dashboard')
     }
   }
 

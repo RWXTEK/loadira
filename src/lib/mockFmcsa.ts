@@ -161,6 +161,54 @@ export const mockCarrier: CarrierData = {
   websiteSlug: 'lone-star-freight',
 }
 
+// Build a CarrierData display object from tenant + fmcsa_data rows, falling back to mockCarrier
+export function buildCarrierDisplay(
+  tenant: { mc_number?: string | null; dot_number?: string | null; legal_name?: string | null; dba_name?: string | null; slug?: string | null } | null,
+  fmcsa: {
+    operating_status?: string | null; safety_rating?: string | null; operation_type?: string | null
+    physical_address?: { street?: string; city?: string; state?: string; zip?: string } | null
+    phone?: string | null; power_units?: number | null; drivers?: number | null
+    insurance_data?: Record<string, unknown> | null; boc3_on_file?: boolean | null
+    cargo_carried?: string[] | null; basics_scores?: Record<string, number> | null
+  } | null,
+): CarrierData {
+  const ins = (fmcsa?.insurance_data || {}) as Record<string, number | string>
+  return {
+    ...mockCarrier,
+    legalName: tenant?.legal_name || mockCarrier.legalName,
+    dbaName: tenant?.dba_name || mockCarrier.dbaName,
+    mcNumber: tenant?.mc_number ? `MC-${tenant.mc_number}` : mockCarrier.mcNumber,
+    dotNumber: tenant?.dot_number || mockCarrier.dotNumber,
+    operatingStatus: fmcsa?.operating_status || mockCarrier.operatingStatus,
+    safetyRating: fmcsa?.safety_rating || mockCarrier.safetyRating,
+    address: fmcsa?.physical_address
+      ? {
+          street: fmcsa.physical_address.street || '',
+          city: fmcsa.physical_address.city || '',
+          state: fmcsa.physical_address.state || '',
+          zip: fmcsa.physical_address.zip || '',
+        }
+      : mockCarrier.address,
+    phone: fmcsa?.phone || mockCarrier.phone,
+    totalDrivers: fmcsa?.drivers ?? mockCarrier.totalDrivers,
+    totalPowerUnits: fmcsa?.power_units ?? mockCarrier.totalPowerUnits,
+    cargoCarried: fmcsa?.cargo_carried || mockCarrier.cargoCarried,
+    insurance: {
+      bipdRequired: Number(ins.bipdRequired) || mockCarrier.insurance.bipdRequired,
+      bipdOnFile: Number(ins.bipdOnFile) || mockCarrier.insurance.bipdOnFile,
+      bipdInsurer: String(ins.bipdInsurer || mockCarrier.insurance.bipdInsurer),
+      bipdPolicyNumber: String(ins.bipdPolicyNumber || mockCarrier.insurance.bipdPolicyNumber),
+      cargoRequired: Number(ins.cargoRequired) || mockCarrier.insurance.cargoRequired,
+      cargoOnFile: Number(ins.cargoOnFile) || mockCarrier.insurance.cargoOnFile,
+      cargoInsurer: String(ins.cargoInsurer || mockCarrier.insurance.cargoInsurer),
+      cargoPolicyNumber: String(ins.cargoPolicyNumber || mockCarrier.insurance.cargoPolicyNumber),
+      bondRequired: Number(ins.bondRequired) || mockCarrier.insurance.bondRequired,
+      bondOnFile: Number(ins.bondOnFile) || mockCarrier.insurance.bondOnFile,
+    },
+    websiteSlug: tenant?.slug || mockCarrier.websiteSlug,
+  }
+}
+
 export function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',

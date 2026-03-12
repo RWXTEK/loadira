@@ -15,14 +15,16 @@ import {
 } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
-import { mockCarrier, formatCurrency } from '../lib/mockFmcsa'
+import { useAuth } from '../hooks/useAuth'
+import { buildCarrierDisplay, formatCurrency } from '../lib/mockFmcsa'
 
 function BrokerPacket() {
-  const carrier = mockCarrier
+  const { tenant, fmcsaData } = useAuth()
+  const carrier = buildCarrierDisplay(tenant, fmcsaData)
 
   return (
     <div className="min-h-screen bg-gray-950 text-white flex flex-col">
-      <Navbar authenticated />
+      <Navbar />
 
       <main className="flex-1 max-w-5xl mx-auto w-full px-6 py-8">
         {/* Header */}

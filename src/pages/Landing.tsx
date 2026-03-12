@@ -1,15 +1,36 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Shield, Truck, FileText, Globe, ChevronRight, Star, Zap, Clock } from 'lucide-react'
+import { Shield, Truck, FileText, Globe, ChevronRight, Star, Zap, Clock, Loader2, CheckCircle, Users, MapPin, ArrowRight } from 'lucide-react'
+import { lookupByMcNumber } from '../lib/fmcsaApi'
+import type { FmcsaCarrier } from '../lib/fmcsaApi'
 
 function Landing() {
   const [mcNumber, setMcNumber] = useState('')
+  const [isLooking, setIsLooking] = useState(false)
+  const [lookupError, setLookupError] = useState('')
+  const [carrier, setCarrier] = useState<FmcsaCarrier | null>(null)
   const navigate = useNavigate()
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (mcNumber.trim()) {
+    if (!mcNumber.trim()) return
+
+    // If we already have a carrier preview, go to signup
+    if (carrier) {
       navigate(`/signup?mc=${encodeURIComponent(mcNumber.trim())}`)
+      return
+    }
+
+    setIsLooking(true)
+    setLookupError('')
+
+    try {
+      const data = await lookupByMcNumber(mcNumber.trim())
+      setCarrier(data)
+    } catch {
+      setLookupError('Carrier not found. Please check your MC number and try again.')
+    } finally {
+      setIsLooking(false)
     }
   }
 
@@ -64,23 +85,95 @@ function Landing() {
                 <input
                   type="text"
                   value={mcNumber}
-                  onChange={(e) => setMcNumber(e.target.value)}
+                  onChange={(e) => {
+                    setMcNumber(e.target.value)
+                    setLookupError('')
+                    setCarrier(null)
+                  }}
                   placeholder="Enter your MC number"
                   className="w-full pl-12 pr-4 py-4 bg-gray-900 border border-gray-700 rounded-xl text-white text-lg placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
                 />
               </div>
               <button
                 type="submit"
-                className="flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white text-lg font-semibold px-8 py-4 rounded-xl transition-all hover:shadow-lg hover:shadow-orange-500/25 cursor-pointer"
+                disabled={!mcNumber.trim() || isLooking}
+                className="flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 disabled:bg-orange-500/50 disabled:cursor-not-allowed text-white text-lg font-semibold px-8 py-4 rounded-xl transition-all hover:shadow-lg hover:shadow-orange-500/25 cursor-pointer"
               >
-                Build My Site Now
-                <ChevronRight className="w-5 h-5" />
+                {isLooking ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Looking up...
+                  </>
+                ) : carrier ? (
+                  <>
+                    Continue to Sign Up
+                    <ArrowRight className="w-5 h-5" />
+                  </>
+                ) : (
+                  <>
+                    Build My Site Now
+                    <ChevronRight className="w-5 h-5" />
+                  </>
+                )}
               </button>
             </div>
-            <p className="text-sm text-gray-500 mt-3">
-              No credit card required to preview your site
-            </p>
+            {lookupError && (
+              <p className="text-red-400 text-sm mt-3">{lookupError}</p>
+            )}
+            {!lookupError && !carrier && (
+              <p className="text-sm text-gray-500 mt-3">
+                No credit card required to preview your site
+              </p>
+            )}
           </form>
+
+          {/* Carrier Preview */}
+          {carrier && (
+            <div className="max-w-xl mx-auto mt-6 bg-orange-500/5 border border-orange-500/20 rounded-2xl p-6 text-left">
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <p className="text-xs text-orange-400 font-medium uppercase tracking-wider mb-1">
+                    Carrier Found
+                  </p>
+                  <h3 className="text-xl font-bold">{carrier.legalName}</h3>
+                  {carrier.dbaName && (
+                    <p className="text-gray-400 text-sm">DBA: {carrier.dbaName}</p>
+                  )}
+                </div>
+                <CheckCircle className="w-6 h-6 text-orange-500 flex-shrink-0" />
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 border-t border-orange-500/10">
+                <div>
+                  <p className="text-xs text-gray-500">MC Number</p>
+                  <p className="font-medium">{carrier.mcNumber || mcNumber}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">DOT Number</p>
+                  <p className="font-medium">{carrier.dotNumber}</p>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Truck className="w-3.5 h-3.5 text-gray-500" />
+                  <div>
+                    <p className="text-xs text-gray-500">Power Units</p>
+                    <p className="font-medium">{carrier.powerUnits}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5 text-gray-500" />
+                  <div>
+                    <p className="text-xs text-gray-500">Drivers</p>
+                    <p className="font-medium">{carrier.drivers}</p>
+                  </div>
+                </div>
+              </div>
+              {carrier.physicalAddress.city && (
+                <div className="flex items-center gap-1.5 mt-3 text-sm text-gray-400">
+                  <MapPin className="w-3.5 h-3.5" />
+                  {carrier.physicalAddress.city}, {carrier.physicalAddress.state} {carrier.physicalAddress.zip}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </section>
 

@@ -7,6 +7,7 @@ import Profile from './pages/Profile'
 import BrokerPacket from './pages/BrokerPacket'
 import Pricing from './pages/Pricing'
 import Settings from './pages/Settings'
+import ProtectedRoute from './components/ProtectedRoute'
 
 function App() {
   return (
@@ -14,11 +15,32 @@ function App() {
       <Route path="/" element={<Landing />} />
       <Route path="/signup" element={<Signup />} />
       <Route path="/login" element={<Login />} />
-      <Route path="/dashboard" element={<Dashboard />} />
-      <Route path="/profile/:slug" element={<Profile />} />
-      <Route path="/broker-packet" element={<BrokerPacket />} />
       <Route path="/pricing" element={<Pricing />} />
-      <Route path="/settings" element={<Settings />} />
+      <Route path="/profile/:slug" element={<Profile />} />
+      <Route
+        path="/dashboard"
+        element={
+          <ProtectedRoute>
+            <Dashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/broker-packet"
+        element={
+          <ProtectedRoute>
+            <BrokerPacket />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          <ProtectedRoute>
+            <Settings />
+          </ProtectedRoute>
+        }
+      />
     </Routes>
   )
 }

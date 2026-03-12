@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useParams } from 'react-router-dom'
 import {
   Shield,
   MapPin,
@@ -18,10 +19,55 @@ import {
   Loader2,
 } from 'lucide-react'
 import Footer from '../components/Footer'
-import { mockCarrier, getSafetyRatingColor, formatCurrency } from '../lib/mockFmcsa'
+import { supabase } from '../lib/supabase'
+import { mockCarrier, buildCarrierDisplay, getSafetyRatingColor, formatCurrency } from '../lib/mockFmcsa'
+import type { CarrierData } from '../lib/mockFmcsa'
 
 function Profile() {
-  const carrier = mockCarrier
+  const { slug } = useParams<{ slug: string }>()
+  const [carrier, setCarrier] = useState<CarrierData & { carrierId: string }>({ ...mockCarrier, carrierId: '' })
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function fetchCarrier() {
+      if (!slug) {
+        setLoading(false)
+        return
+      }
+
+      // Look up tenant by slug
+      const { data: tenantData } = await supabase
+        .from('tenants')
+        .select('*')
+        .eq('slug', slug)
+        .single()
+
+      if (tenantData) {
+        // Fetch fmcsa_data for this tenant
+        const { data: fmcsaRow } = await supabase
+          .from('fmcsa_data')
+          .select('*')
+          .eq('tenant_id', tenantData.id)
+          .single()
+
+        const display = buildCarrierDisplay(tenantData, fmcsaRow)
+        setCarrier({ ...display, carrierId: tenantData.id })
+      }
+      // If no data found, fall back to mockCarrier (already set as default)
+      setLoading(false)
+    }
+
+    fetchCarrier()
+  }, [slug])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
+      </div>
+    )
+  }
+
   const rating = getSafetyRatingColor(carrier.safetyRating)
 
   return (
@@ -266,7 +312,7 @@ function Profile() {
             {/* Request Quote Form */}
             <div id="request-quote" className="bg-gray-900/50 border border-gray-800 rounded-2xl p-6">
               <h3 className="text-lg font-semibold mb-4">Request a Quote</h3>
-              <QuoteForm />
+              <QuoteForm carrierId={carrier.carrierId} />
             </div>
 
             {/* Quick Info */}
@@ -373,7 +419,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   )
 }
 
-function QuoteForm() {
+function QuoteForm({ carrierId }: { carrierId: string }) {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [details, setDetails] = useState('')
@@ -383,7 +429,16 @@ function QuoteForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+
+    if (carrierId) {
+      await supabase.from('quote_requests').insert({
+        carrier_id: carrierId,
+        name,
+        email,
+        details,
+      })
+    }
+
     setIsLoading(false)
     setSubmitted(true)
   }

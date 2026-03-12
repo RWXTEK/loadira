@@ -1,16 +1,23 @@
 import { useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Shield, Menu, X } from 'lucide-react'
+import { useAuth } from '../hooks/useAuth'
 
-interface NavbarProps {
-  authenticated?: boolean
-}
-
-function Navbar({ authenticated = false }: NavbarProps) {
+function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const location = useLocation()
+  const navigate = useNavigate()
+  const { user, tenant, signOut } = useAuth()
+
+  const authenticated = !!user
+  const profileSlug = tenant?.slug || 'my-carrier'
 
   const isActive = (path: string) => location.pathname === path
+
+  const handleSignOut = async () => {
+    await signOut()
+    navigate('/login')
+  }
 
   return (
     <nav className="border-b border-gray-800/50 bg-gray-950/80 backdrop-blur-md sticky top-0 z-50">
@@ -25,15 +32,15 @@ function Navbar({ authenticated = false }: NavbarProps) {
           {authenticated ? (
             <>
               <NavLink to="/dashboard" active={isActive('/dashboard')}>Dashboard</NavLink>
-              <NavLink to="/profile/lone-star-freight" active={isActive('/profile/lone-star-freight')}>My Profile</NavLink>
+              <NavLink to={`/profile/${profileSlug}`} active={location.pathname.startsWith('/profile/')}>My Profile</NavLink>
               <NavLink to="/broker-packet" active={isActive('/broker-packet')}>Broker Packet</NavLink>
               <NavLink to="/settings" active={isActive('/settings')}>Settings</NavLink>
-              <Link
-                to="/login"
-                className="text-sm text-gray-400 hover:text-white transition-colors"
+              <button
+                onClick={handleSignOut}
+                className="text-sm text-gray-400 hover:text-white transition-colors cursor-pointer"
               >
                 Log Out
-              </Link>
+              </button>
             </>
           ) : (
             <>
@@ -69,10 +76,15 @@ function Navbar({ authenticated = false }: NavbarProps) {
           {authenticated ? (
             <>
               <MobileLink to="/dashboard" onClick={() => setMobileOpen(false)}>Dashboard</MobileLink>
-              <MobileLink to="/profile/lone-star-freight" onClick={() => setMobileOpen(false)}>My Profile</MobileLink>
+              <MobileLink to={`/profile/${profileSlug}`} onClick={() => setMobileOpen(false)}>My Profile</MobileLink>
               <MobileLink to="/broker-packet" onClick={() => setMobileOpen(false)}>Broker Packet</MobileLink>
               <MobileLink to="/settings" onClick={() => setMobileOpen(false)}>Settings</MobileLink>
-              <MobileLink to="/login" onClick={() => setMobileOpen(false)}>Log Out</MobileLink>
+              <button
+                onClick={() => { setMobileOpen(false); handleSignOut() }}
+                className="block text-gray-300 hover:text-white py-2 transition-colors cursor-pointer"
+              >
+                Log Out
+              </button>
             </>
           ) : (
             <>
