@@ -20,6 +20,8 @@ import {
 import Footer from '../components/Footer'
 import { supabase } from '../lib/supabase'
 import { mockCarrier, buildCarrierDisplay, getSafetyRatingColor, formatCurrency } from '../lib/mockFmcsa'
+import type { Carrier } from '../hooks/useAuth'
+import LoadiraLogo from '../components/LoadiraLogo'
 import type { CarrierData } from '../lib/mockFmcsa'
 
 function Profile() {
@@ -34,23 +36,16 @@ function Profile() {
         return
       }
 
-      // Look up tenant by slug
-      const { data: tenantData } = await supabase
-        .from('tenants')
+      // Look up carrier by website_slug
+      const { data: carrierRow } = await supabase
+        .from('carriers')
         .select('*')
-        .eq('slug', slug)
+        .eq('website_slug', slug)
         .single()
 
-      if (tenantData) {
-        // Fetch fmcsa_data for this tenant
-        const { data: fmcsaRow } = await supabase
-          .from('fmcsa_data')
-          .select('*')
-          .eq('tenant_id', tenantData.id)
-          .single()
-
-        const display = buildCarrierDisplay(tenantData, fmcsaRow)
-        setCarrier({ ...display, carrierId: tenantData.id })
+      if (carrierRow) {
+        const display = buildCarrierDisplay(carrierRow as Carrier)
+        setCarrier({ ...display, carrierId: carrierRow.id })
       }
       // If no data found, fall back to mockCarrier (already set as default)
       setLoading(false)
@@ -74,8 +69,9 @@ function Profile() {
       {/* Public Nav */}
       <nav className="border-b border-gray-800/50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <img src="/loadira-logo.png" alt="Loadira" className="w-8 h-8" />
+          <div className="flex items-center gap-3">
+            <LoadiraLogo size="sm" />
+            <span className="text-gray-600 mx-1">|</span>
             <span className="text-xl font-bold tracking-tight">{carrier.dbaName || carrier.legalName}</span>
           </div>
           <a
@@ -334,8 +330,7 @@ function Profile() {
       <div className="border-t border-gray-800/50 bg-gray-900/30">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-center gap-2 text-sm text-gray-500">
           <span>Powered by</span>
-          <img src="/loadira-logo.png" alt="Loadira" className="w-4 h-4" />
-          <span className="font-semibold text-gray-400">Loadira</span>
+          <LoadiraLogo size="sm" />
         </div>
       </div>
 

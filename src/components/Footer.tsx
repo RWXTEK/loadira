@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import LoadiraLogo from './LoadiraLogo'
 
 function Footer() {
   return (
@@ -7,8 +8,7 @@ function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
           <div className="md:col-span-1">
             <Link to="/" className="flex items-center gap-2 mb-4">
-              <img src="/loadira-logo.png" alt="Loadira" className="w-6 h-6" />
-              <span className="text-lg font-bold text-white">Loadira</span>
+              <LoadiraLogo size="sm" />
             </Link>
             <p className="text-sm text-gray-500 leading-relaxed">
               Professional online presence for trucking companies. Powered by FMCSA data.

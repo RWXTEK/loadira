@@ -21,9 +21,9 @@ import { useAuth } from '../hooks/useAuth'
 import { buildCarrierDisplay, getSafetyRatingColor, formatCurrency } from '../lib/mockFmcsa'
 
 function Dashboard() {
-  const { tenant, fmcsaData } = useAuth()
+  const { carrier: carrierRow } = useAuth()
 
-  const carrier = buildCarrierDisplay(tenant, fmcsaData)
+  const carrier = buildCarrierDisplay(carrierRow)
 
   const rating = getSafetyRatingColor(carrier.safetyRating)
 

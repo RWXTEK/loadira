@@ -2,15 +2,16 @@ import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Menu, X } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
+import LoadiraLogo from './LoadiraLogo'
 
 function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
-  const { user, tenant, signOut } = useAuth()
+  const { user, carrier, signOut } = useAuth()
 
   const authenticated = !!user
-  const profileSlug = tenant?.slug || 'my-carrier'
+  const profileSlug = carrier?.website_slug || 'my-carrier'
 
   const isActive = (path: string) => location.pathname === path
 
@@ -23,8 +24,7 @@ function Navbar() {
     <nav className="border-b border-gray-800/50 bg-gray-950/80 backdrop-blur-md sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
         <Link to={authenticated ? '/dashboard' : '/'} className="flex items-center gap-2">
-          <img src="/loadira-logo.png" alt="Loadira" className="h-10 w-auto" />
-          <span className="text-xl font-bold tracking-tight text-white">Loadira</span>
+          <LoadiraLogo size="md" />
         </Link>
 
         {/* Desktop Nav */}

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, ArrowRight, Loader2 } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
+import LoadiraLogo from '../components/LoadiraLogo'
 
 function Login() {
   const [email, setEmail] = useState('')
@@ -31,8 +32,7 @@ function Login() {
       <nav className="border-b border-gray-800/50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
-            <img src="/loadira-logo.png" alt="Loadira" className="w-8 h-8" />
-            <span className="text-xl font-bold tracking-tight">Loadira</span>
+            <LoadiraLogo size="md" />
           </Link>
           <p className="text-sm text-gray-400">
             Don't have an account?{' '}

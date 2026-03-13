@@ -5,6 +5,7 @@ import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
 import { lookupByMcNumber } from '../lib/fmcsaApi'
 import type { FmcsaCarrier } from '../lib/fmcsaApi'
+import LoadiraLogo from '../components/LoadiraLogo'
 
 type Step = 'mc' | 'account' | 'confirm'
 
@@ -67,58 +68,51 @@ function Signup() {
       return
     }
 
-    // 2. If we have a session (email confirm disabled), create DB rows
+    // 2. If we have a session (email confirm disabled), create the carrier row
     if (userId && hasSession) {
       const slug = fmcsaResult.legalName
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/(^-|-$)/g, '')
 
-      // Create tenant
-      const { data: tenantRow, error: tenantError } = await supabase
-        .from('tenants')
+      const { error: carrierError } = await supabase
+        .from('carriers')
         .insert({
           user_id: userId,
           mc_number: mcNumber.trim(),
           dot_number: fmcsaResult.dotNumber,
           legal_name: fmcsaResult.legalName,
           dba_name: fmcsaResult.dbaName || null,
-          slug,
+          entity_type: fmcsaResult.entityType || null,
+          operating_status: fmcsaResult.operatingStatus || null,
+          phone: fmcsaResult.phone || null,
+          address_street: fmcsaResult.physicalAddress.street || null,
+          address_city: fmcsaResult.physicalAddress.city || null,
+          address_state: fmcsaResult.physicalAddress.state || null,
+          address_zip: fmcsaResult.physicalAddress.zip || null,
+          safety_rating: fmcsaResult.safetyRating || null,
+          total_drivers: fmcsaResult.drivers || null,
+          total_power_units: fmcsaResult.powerUnits || null,
+          cargo_carried: fmcsaResult.cargoCarried.length > 0 ? fmcsaResult.cargoCarried : null,
+          bipd_required: fmcsaResult.insuranceData.bipdRequired || null,
+          bipd_on_file: fmcsaResult.insuranceData.bipdOnFile || null,
+          bipd_insurer: fmcsaResult.insuranceData.bipdInsurer || null,
+          cargo_required: fmcsaResult.insuranceData.cargoRequired || null,
+          cargo_on_file: fmcsaResult.insuranceData.cargoOnFile || null,
+          cargo_insurer: fmcsaResult.insuranceData.cargoInsurer || null,
+          bond_on_file: fmcsaResult.insuranceData.bondOnFile || null,
+          website_slug: slug,
+          brand_color: '#f97316',
         })
-        .select()
-        .single()
 
-      if (tenantError) {
-        setSignupError(tenantError.message)
+      if (carrierError) {
+        setSignupError(carrierError.message)
         setIsSubmitting(false)
         return
       }
-
-      if (tenantRow) {
-        // Create fmcsa_data and website_settings in parallel
-        await Promise.all([
-          supabase.from('fmcsa_data').insert({
-            tenant_id: tenantRow.id,
-            operating_status: fmcsaResult.operatingStatus,
-            safety_rating: fmcsaResult.safetyRating,
-            operation_type: fmcsaResult.entityType,
-            physical_address: fmcsaResult.physicalAddress,
-            phone: fmcsaResult.phone,
-            power_units: fmcsaResult.powerUnits,
-            drivers: fmcsaResult.drivers,
-            insurance_data: fmcsaResult.insuranceData,
-            boc3_on_file: fmcsaResult.boc3OnFile,
-            cargo_carried: fmcsaResult.cargoCarried,
-            basics_scores: fmcsaResult.basicsScores,
-            last_fmcsa_sync: new Date().toISOString(),
-          }),
-          supabase.from('website_settings').insert({
-            tenant_id: tenantRow.id,
-            primary_color: '#FF6B35',
-            theme: 'dark',
-          }),
-        ])
-      }
+    } else if (userId && !hasSession) {
+      // Email confirmation required - user needs to check email
+      // We'll create the carrier row after they confirm and log in
     }
 
     setIsSubmitting(false)
@@ -131,8 +125,7 @@ function Signup() {
       <nav className="border-b border-gray-800/50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
-            <img src="/loadira-logo.png" alt="Loadira" className="w-8 h-8" />
-            <span className="text-xl font-bold tracking-tight">Loadira</span>
+            <LoadiraLogo size="md" />
           </Link>
           <p className="text-sm text-gray-400">
             Already have an account?{' '}
@@ -375,16 +368,13 @@ function Signup() {
                 <CheckCircle className="w-8 h-8 text-orange-500" />
               </div>
               <h1 className="text-2xl font-bold mb-2">You're all set!</h1>
-              <p className="text-gray-400 mb-2">
-                We're building your carrier website right now.
-              </p>
-              <p className="text-gray-500 text-sm mb-8">
-                Check your email at <span className="text-white">{email}</span> to verify your account.
+              <p className="text-gray-400 mb-8">
+                Your carrier website is ready. Head to your dashboard to see everything.
               </p>
 
               {fmcsaResult && (
                 <div className="bg-gray-800/50 rounded-xl p-5 mb-8 text-left">
-                  <h3 className="font-semibold mb-3">What's being set up:</h3>
+                  <h3 className="font-semibold mb-3">What's been set up:</h3>
                   <ul className="space-y-2.5">
                     <ConfirmItem text={`Professional website for ${fmcsaResult.legalName}`} />
                     <ConfirmItem text="Carrier profile with your FMCSA data" />

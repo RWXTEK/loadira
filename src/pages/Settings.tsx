@@ -18,11 +18,11 @@ import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
 
 function Settings() {
-  const { tenant, settings, refreshTenant } = useAuth()
+  const { carrier, refreshCarrier } = useAuth()
 
-  const [heroText, setHeroText] = useState(settings?.hero_text || '')
-  const [primaryColor, setPrimaryColor] = useState(settings?.primary_color || '#FF6B35')
-  const [logoUrl] = useState(settings?.logo_url || '')
+  const [heroText, setHeroText] = useState(carrier?.company_description || '')
+  const [primaryColor, setPrimaryColor] = useState(carrier?.brand_color || '#f97316')
+  const [logoUrl] = useState(carrier?.logo_url || '')
   const [isSaving, setIsSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 
@@ -40,25 +40,17 @@ function Settings() {
     setIsSaving(true)
     setSaved(false)
 
-    if (tenant && settings) {
+    if (carrier) {
       await supabase
-        .from('website_settings')
+        .from('carriers')
         .update({
-          primary_color: primaryColor,
-          hero_text: heroText,
+          brand_color: primaryColor,
+          company_description: heroText,
         })
-        .eq('id', settings.id)
-    } else if (tenant) {
-      // No settings row yet — create one
-      await supabase.from('website_settings').insert({
-        tenant_id: tenant.id,
-        primary_color: primaryColor,
-        hero_text: heroText,
-        theme: 'dark',
-      })
+        .eq('id', carrier.id)
     }
 
-    await refreshTenant()
+    await refreshCarrier()
     setIsSaving(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 3000)

@@ -2,60 +2,75 @@ import { createContext, useContext, useEffect, useState, useCallback } from 'rea
 import type { User, Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 
-// Row types matching the new schema
-export interface Tenant {
+// Matches the carriers table in the database
+export interface Carrier {
   id: string
   user_id: string
-  mc_number: string | null
-  dot_number: string | null
-  legal_name: string | null
+  mc_number: string
+  dot_number: string
+  legal_name: string
   dba_name: string | null
-  slug: string | null
-  custom_domain: string | null
-  stripe_customer_id: string | null
-  plan: string | null
-  subscription_status: string | null
-  created_at: string
-}
-
-export interface FmcsaDataRow {
-  id: string
-  tenant_id: string
+  entity_type: string | null
   operating_status: string | null
-  safety_rating: string | null
-  operation_type: string | null
-  physical_address: { street?: string; city?: string; state?: string; zip?: string } | null
   phone: string | null
-  power_units: number | null
-  drivers: number | null
-  insurance_data: Record<string, unknown> | null
-  boc3_on_file: boolean | null
+  email: string | null
+  address_street: string | null
+  address_city: string | null
+  address_state: string | null
+  address_zip: string | null
+  mailing_street: string | null
+  mailing_city: string | null
+  mailing_state: string | null
+  mailing_zip: string | null
+  safety_rating: string | null
+  safety_rating_date: string | null
+  total_drivers: number | null
+  total_power_units: number | null
+  operation_classification: string[] | null
+  carrier_operation: string[] | null
   cargo_carried: string[] | null
-  basics_scores: Record<string, number> | null
-  last_fmcsa_sync: string | null
-  raw_response: Record<string, unknown> | null
-}
-
-export interface WebsiteSettingsRow {
-  id: string
-  tenant_id: string
-  primary_color: string | null
+  bipd_required: number | null
+  bipd_on_file: number | null
+  bipd_insurer: string | null
+  bipd_policy_number: string | null
+  cargo_required: number | null
+  cargo_on_file: number | null
+  cargo_insurer: string | null
+  cargo_policy_number: string | null
+  bond_required: number | null
+  bond_on_file: number | null
+  vehicle_inspections_total: number | null
+  vehicle_inspections_oos: number | null
+  driver_inspections_total: number | null
+  driver_inspections_oos: number | null
+  hazmat_inspections_total: number | null
+  hazmat_inspections_oos: number | null
+  crashes_fatal: number | null
+  crashes_injury: number | null
+  crashes_towaway: number | null
+  equipment: Record<string, unknown> | null
+  service_lanes: string[] | null
+  company_description: string | null
   logo_url: string | null
-  hero_text: string | null
-  theme: string | null
+  brand_color: string
+  website_slug: string
+  plan: string
+  stripe_customer_id: string | null
+  stripe_subscription_id: string | null
+  fmcsa_raw: Record<string, unknown> | null
+  created_at: string
+  updated_at: string
 }
 
 interface AuthContextType {
   user: User | null
   session: Session | null
-  tenant: Tenant | null
-  fmcsaData: FmcsaDataRow | null
-  settings: WebsiteSettingsRow | null
+  carrier: Carrier | null
   loading: boolean
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: string | null; userId: string | null; hasSession: boolean }>
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
-  refreshTenant: () => Promise<void>
+  refreshCarrier: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -63,49 +78,31 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
-  const [tenant, setTenant] = useState<Tenant | null>(null)
-  const [fmcsaData, setFmcsaData] = useState<FmcsaDataRow | null>(null)
-  const [settings, setSettings] = useState<WebsiteSettingsRow | null>(null)
+  const [carrier, setCarrier] = useState<Carrier | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const fetchTenantData = useCallback(async (userId: string) => {
-    // Fetch tenant
-    const { data: tenantData } = await supabase
-      .from('tenants')
+  const fetchCarrierData = useCallback(async (userId: string) => {
+    const { data } = await supabase
+      .from('carriers')
       .select('*')
       .eq('user_id', userId)
       .single()
 
-    if (tenantData) {
-      setTenant(tenantData as Tenant)
-
-      // Fetch fmcsa_data and website_settings in parallel
-      const [fmcsaResult, settingsResult] = await Promise.all([
-        supabase.from('fmcsa_data').select('*').eq('tenant_id', tenantData.id).single(),
-        supabase.from('website_settings').select('*').eq('tenant_id', tenantData.id).single(),
-      ])
-
-      setFmcsaData((fmcsaResult.data as FmcsaDataRow) ?? null)
-      setSettings((settingsResult.data as WebsiteSettingsRow) ?? null)
-    } else {
-      setTenant(null)
-      setFmcsaData(null)
-      setSettings(null)
-    }
+    setCarrier((data as Carrier) ?? null)
   }, [])
 
-  const refreshTenant = useCallback(async () => {
+  const refreshCarrier = useCallback(async () => {
     if (user) {
-      await fetchTenantData(user.id)
+      await fetchCarrierData(user.id)
     }
-  }, [user, fetchTenantData])
+  }, [user, fetchCarrierData])
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
       setUser(session?.user ?? null)
       if (session?.user) {
-        fetchTenantData(session.user.id).then(() => setLoading(false))
+        fetchCarrierData(session.user.id).then(() => setLoading(false))
       } else {
         setLoading(false)
       }
@@ -117,16 +114,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(session)
       setUser(session?.user ?? null)
       if (session?.user) {
-        fetchTenantData(session.user.id)
+        fetchCarrierData(session.user.id)
       } else {
-        setTenant(null)
-        setFmcsaData(null)
-        setSettings(null)
+        setCarrier(null)
       }
     })
 
     return () => subscription.unsubscribe()
-  }, [fetchTenantData])
+  }, [fetchCarrierData])
 
   const signUp = async (email: string, password: string, fullName: string) => {
     try {
@@ -180,14 +175,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     await supabase.auth.signOut()
-    setTenant(null)
-    setFmcsaData(null)
-    setSettings(null)
+    setCarrier(null)
   }
 
   return (
     <AuthContext.Provider
-      value={{ user, session, tenant, fmcsaData, settings, loading, signUp, signIn, signOut, refreshTenant }}
+      value={{ user, session, carrier, loading, signUp, signIn, signOut, refreshCarrier }}
     >
       {children}
     </AuthContext.Provider>

@@ -1,3 +1,5 @@
+import type { Carrier } from '../hooks/useAuth'
+
 export interface CarrierData {
   legalName: string
   dbaName: string
@@ -161,51 +163,95 @@ export const mockCarrier: CarrierData = {
   websiteSlug: 'lone-star-freight',
 }
 
-// Build a CarrierData display object from tenant + fmcsa_data rows, falling back to mockCarrier
-export function buildCarrierDisplay(
-  tenant: { mc_number?: string | null; dot_number?: string | null; legal_name?: string | null; dba_name?: string | null; slug?: string | null } | null,
-  fmcsa: {
-    operating_status?: string | null; safety_rating?: string | null; operation_type?: string | null
-    physical_address?: { street?: string; city?: string; state?: string; zip?: string } | null
-    phone?: string | null; power_units?: number | null; drivers?: number | null
-    insurance_data?: Record<string, unknown> | null; boc3_on_file?: boolean | null
-    cargo_carried?: string[] | null; basics_scores?: Record<string, number> | null
-  } | null,
-): CarrierData {
-  const ins = (fmcsa?.insurance_data || {}) as Record<string, number | string>
+function oosRate(total: number | null | undefined, oos: number | null | undefined): number {
+  const t = total ?? 0
+  const o = oos ?? 0
+  return t > 0 ? Math.round((o / t) * 1000) / 10 : 0
+}
+
+// Build a CarrierData display object from a carriers DB row, falling back to mockCarrier
+export function buildCarrierDisplay(row: Carrier | null): CarrierData {
+  if (!row) return mockCarrier
+
+  const eq = (row.equipment || {}) as Record<string, number>
+
   return {
-    ...mockCarrier,
-    legalName: tenant?.legal_name || mockCarrier.legalName,
-    dbaName: tenant?.dba_name || mockCarrier.dbaName,
-    mcNumber: tenant?.mc_number ? `MC-${tenant.mc_number}` : mockCarrier.mcNumber,
-    dotNumber: tenant?.dot_number || mockCarrier.dotNumber,
-    operatingStatus: fmcsa?.operating_status || mockCarrier.operatingStatus,
-    safetyRating: fmcsa?.safety_rating || mockCarrier.safetyRating,
-    address: fmcsa?.physical_address
-      ? {
-          street: fmcsa.physical_address.street || '',
-          city: fmcsa.physical_address.city || '',
-          state: fmcsa.physical_address.state || '',
-          zip: fmcsa.physical_address.zip || '',
-        }
-      : mockCarrier.address,
-    phone: fmcsa?.phone || mockCarrier.phone,
-    totalDrivers: fmcsa?.drivers ?? mockCarrier.totalDrivers,
-    totalPowerUnits: fmcsa?.power_units ?? mockCarrier.totalPowerUnits,
-    cargoCarried: fmcsa?.cargo_carried || mockCarrier.cargoCarried,
-    insurance: {
-      bipdRequired: Number(ins.bipdRequired) || mockCarrier.insurance.bipdRequired,
-      bipdOnFile: Number(ins.bipdOnFile) || mockCarrier.insurance.bipdOnFile,
-      bipdInsurer: String(ins.bipdInsurer || mockCarrier.insurance.bipdInsurer),
-      bipdPolicyNumber: String(ins.bipdPolicyNumber || mockCarrier.insurance.bipdPolicyNumber),
-      cargoRequired: Number(ins.cargoRequired) || mockCarrier.insurance.cargoRequired,
-      cargoOnFile: Number(ins.cargoOnFile) || mockCarrier.insurance.cargoOnFile,
-      cargoInsurer: String(ins.cargoInsurer || mockCarrier.insurance.cargoInsurer),
-      cargoPolicyNumber: String(ins.cargoPolicyNumber || mockCarrier.insurance.cargoPolicyNumber),
-      bondRequired: Number(ins.bondRequired) || mockCarrier.insurance.bondRequired,
-      bondOnFile: Number(ins.bondOnFile) || mockCarrier.insurance.bondOnFile,
+    legalName: row.legal_name || mockCarrier.legalName,
+    dbaName: row.dba_name || mockCarrier.dbaName,
+    mcNumber: row.mc_number ? `MC-${row.mc_number}` : mockCarrier.mcNumber,
+    dotNumber: row.dot_number || mockCarrier.dotNumber,
+    entityType: row.entity_type || mockCarrier.entityType,
+    operatingStatus: row.operating_status || mockCarrier.operatingStatus,
+    outOfServiceDate: null,
+    address: {
+      street: row.address_street || mockCarrier.address.street,
+      city: row.address_city || mockCarrier.address.city,
+      state: row.address_state || mockCarrier.address.state,
+      zip: row.address_zip || mockCarrier.address.zip,
     },
-    websiteSlug: tenant?.slug || mockCarrier.websiteSlug,
+    phone: row.phone || mockCarrier.phone,
+    email: row.email || mockCarrier.email,
+    mailingAddress: {
+      street: row.mailing_street || mockCarrier.mailingAddress.street,
+      city: row.mailing_city || mockCarrier.mailingAddress.city,
+      state: row.mailing_state || mockCarrier.mailingAddress.state,
+      zip: row.mailing_zip || mockCarrier.mailingAddress.zip,
+    },
+    safetyRating: row.safety_rating || mockCarrier.safetyRating,
+    safetyRatingDate: row.safety_rating_date || mockCarrier.safetyRatingDate,
+    totalDrivers: row.total_drivers ?? mockCarrier.totalDrivers,
+    totalPowerUnits: row.total_power_units ?? mockCarrier.totalPowerUnits,
+    operationClassification: row.operation_classification || mockCarrier.operationClassification,
+    carrierOperation: row.carrier_operation || mockCarrier.carrierOperation,
+    cargoCarried: row.cargo_carried || mockCarrier.cargoCarried,
+    insurance: {
+      bipdRequired: row.bipd_required ?? mockCarrier.insurance.bipdRequired,
+      bipdOnFile: row.bipd_on_file ?? mockCarrier.insurance.bipdOnFile,
+      bipdInsurer: row.bipd_insurer || mockCarrier.insurance.bipdInsurer,
+      bipdPolicyNumber: row.bipd_policy_number || mockCarrier.insurance.bipdPolicyNumber,
+      cargoRequired: row.cargo_required ?? mockCarrier.insurance.cargoRequired,
+      cargoOnFile: row.cargo_on_file ?? mockCarrier.insurance.cargoOnFile,
+      cargoInsurer: row.cargo_insurer || mockCarrier.insurance.cargoInsurer,
+      cargoPolicyNumber: row.cargo_policy_number || mockCarrier.insurance.cargoPolicyNumber,
+      bondRequired: row.bond_required ?? mockCarrier.insurance.bondRequired,
+      bondOnFile: row.bond_on_file ?? mockCarrier.insurance.bondOnFile,
+    },
+    inspections: {
+      vehicleTotal: row.vehicle_inspections_total ?? mockCarrier.inspections.vehicleTotal,
+      vehicleOos: row.vehicle_inspections_oos ?? mockCarrier.inspections.vehicleOos,
+      vehicleOosRate: row.vehicle_inspections_total != null
+        ? oosRate(row.vehicle_inspections_total, row.vehicle_inspections_oos)
+        : mockCarrier.inspections.vehicleOosRate,
+      driverTotal: row.driver_inspections_total ?? mockCarrier.inspections.driverTotal,
+      driverOos: row.driver_inspections_oos ?? mockCarrier.inspections.driverOos,
+      driverOosRate: row.driver_inspections_total != null
+        ? oosRate(row.driver_inspections_total, row.driver_inspections_oos)
+        : mockCarrier.inspections.driverOosRate,
+      hazmatTotal: row.hazmat_inspections_total ?? mockCarrier.inspections.hazmatTotal,
+      hazmatOos: row.hazmat_inspections_oos ?? mockCarrier.inspections.hazmatOos,
+      hazmatOosRate: row.hazmat_inspections_total != null
+        ? oosRate(row.hazmat_inspections_total, row.hazmat_inspections_oos)
+        : mockCarrier.inspections.hazmatOosRate,
+    },
+    crashes: {
+      fatal: row.crashes_fatal ?? mockCarrier.crashes.fatal,
+      injury: row.crashes_injury ?? mockCarrier.crashes.injury,
+      towaway: row.crashes_towaway ?? mockCarrier.crashes.towaway,
+      total: (row.crashes_fatal ?? 0) + (row.crashes_injury ?? 0) + (row.crashes_towaway ?? 0) || mockCarrier.crashes.total,
+    },
+    equipment: {
+      straightTrucks: eq.straightTrucks ?? mockCarrier.equipment.straightTrucks,
+      tractorTrailers: eq.tractorTrailers ?? mockCarrier.equipment.tractorTrailers,
+      flatbeds: eq.flatbeds ?? mockCarrier.equipment.flatbeds,
+      reefers: eq.reefers ?? mockCarrier.equipment.reefers,
+      tankers: eq.tankers ?? mockCarrier.equipment.tankers,
+      intermodal: eq.intermodal ?? mockCarrier.equipment.intermodal,
+    },
+    serviceLanes: row.service_lanes || mockCarrier.serviceLanes,
+    companyDescription: row.company_description || mockCarrier.companyDescription,
+    logoUrl: row.logo_url || null,
+    brandColor: row.brand_color || mockCarrier.brandColor,
+    websiteSlug: row.website_slug || mockCarrier.websiteSlug,
   }
 }
 

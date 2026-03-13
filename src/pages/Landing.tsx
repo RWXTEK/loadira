@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Truck, FileText, Globe, ChevronRight, Star, Zap, Clock, Loader2, CheckCircle, Users, MapPin, ArrowRight, Shield } from 'lucide-react'
+import { FileText, Globe, ChevronRight, Star, Zap, Clock, Loader2, CheckCircle, Users, MapPin, ArrowRight, Shield, Truck } from 'lucide-react'
 import { lookupByMcNumber } from '../lib/fmcsaApi'
+import LoadiraLogo from '../components/LoadiraLogo'
 import type { FmcsaCarrier } from '../lib/fmcsaApi'
 
 function Landing() {
@@ -39,10 +40,7 @@ function Landing() {
       {/* Navigation */}
       <nav className="border-b border-gray-800/50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <img src="/loadira-logo.png" alt="Loadira" className="w-8 h-8" />
-            <span className="text-xl font-bold tracking-tight">Loadira</span>
-          </div>
+          <LoadiraLogo size="md" />
           <div className="flex items-center gap-4">
             <a href="/login" className="text-sm text-gray-400 hover:text-white transition-colors">
               Log In
@@ -63,6 +61,10 @@ function Landing() {
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative max-w-4xl mx-auto px-6 pt-24 pb-20 text-center">
+          <div className="flex justify-center mb-8">
+            <LoadiraLogo size="hero" />
+          </div>
+
           <div className="inline-flex items-center gap-2 bg-orange-500/10 border border-orange-500/20 rounded-full px-4 py-1.5 mb-8">
             <Zap className="w-4 h-4 text-orange-500" />
             <span className="text-sm text-orange-400 font-medium">Powered by FMCSA Data</span>
@@ -283,10 +285,7 @@ function Landing() {
       {/* Footer */}
       <footer className="border-t border-gray-800/50">
         <div className="max-w-7xl mx-auto px-6 py-8 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <img src="/loadira-logo.png" alt="Loadira" className="w-5 h-5" />
-            <span className="text-sm font-semibold">Loadira</span>
-          </div>
+          <LoadiraLogo size="sm" />
           <p className="text-sm text-gray-500">
             &copy; {new Date().getFullYear()} Loadira - A RWX-TEK INC Company. All rights reserved.
           </p>
