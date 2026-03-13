@@ -23,7 +23,7 @@ function Navbar() {
     <nav className="border-b border-gray-800/50 bg-gray-950/80 backdrop-blur-md sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
         <Link to={authenticated ? '/dashboard' : '/'} className="flex items-center gap-2">
-          <img src="/loadira-logo.png" alt="Loadira" className="w-8 h-8" />
+          <img src="/loadira-logo.png" alt="Loadira" className="h-10 w-auto" />
           <span className="text-xl font-bold tracking-tight text-white">Loadira</span>
         </Link>
 
