@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Shield, Truck, FileText, Globe, ChevronRight, Star, Zap, Clock, Loader2, CheckCircle, Users, MapPin, ArrowRight } from 'lucide-react'
+import { Truck, FileText, Globe, ChevronRight, Star, Zap, Clock, Loader2, CheckCircle, Users, MapPin, ArrowRight, Shield } from 'lucide-react'
 import { lookupByMcNumber } from '../lib/fmcsaApi'
 import type { FmcsaCarrier } from '../lib/fmcsaApi'
 
@@ -40,8 +40,8 @@ function Landing() {
       <nav className="border-b border-gray-800/50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Shield className="w-8 h-8 text-orange-500" />
-            <span className="text-xl font-bold tracking-tight">CarrierShield</span>
+            <img src="/loadira-logo.png" alt="Loadira" className="w-8 h-8" />
+            <span className="text-xl font-bold tracking-tight">Loadira</span>
           </div>
           <div className="flex items-center gap-4">
             <a href="/login" className="text-sm text-gray-400 hover:text-white transition-colors">
@@ -284,11 +284,11 @@ function Landing() {
       <footer className="border-t border-gray-800/50">
         <div className="max-w-7xl mx-auto px-6 py-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <Shield className="w-5 h-5 text-orange-500" />
-            <span className="text-sm font-semibold">CarrierShield</span>
+            <img src="/loadira-logo.png" alt="Loadira" className="w-5 h-5" />
+            <span className="text-sm font-semibold">Loadira</span>
           </div>
           <p className="text-sm text-gray-500">
-            &copy; {new Date().getFullYear()} RWX-TEK INC. All rights reserved.
+            &copy; {new Date().getFullYear()} Loadira - A RWX-TEK INC Company. All rights reserved.
           </p>
         </div>
       </footer>

@@ -129,23 +129,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [fetchTenantData])
 
   const signUp = async (email: string, password: string, fullName: string) => {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { full_name: fullName },
-      },
-    })
-    return {
-      error: error?.message ?? null,
-      userId: data?.user?.id ?? null,
-      hasSession: !!data?.session,
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { full_name: fullName },
+        },
+      })
+      if (error) {
+        const msg = error.message === 'Failed to fetch'
+          ? 'Unable to connect to the server. Please check your internet connection and verify the Supabase project URL is correct in .env.local.'
+          : error.message
+        return { error: msg, userId: null, hasSession: false }
+      }
+      return {
+        error: null,
+        userId: data?.user?.id ?? null,
+        hasSession: !!data?.session,
+      }
+    } catch (err) {
+      return {
+        error: err instanceof Error && err.message === 'Failed to fetch'
+          ? 'Unable to connect to the server. Check your Supabase URL and network connection.'
+          : 'An unexpected error occurred. Please try again.',
+        userId: null,
+        hasSession: false,
+      }
     }
   }
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    return { error: error?.message ?? null }
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) {
+        const msg = error.message === 'Failed to fetch'
+          ? 'Unable to connect to the server. Please check your internet connection and verify the Supabase project URL is correct in .env.local.'
+          : error.message
+        return { error: msg }
+      }
+      return { error: null }
+    } catch (err) {
+      return {
+        error: err instanceof Error && err.message === 'Failed to fetch'
+          ? 'Unable to connect to the server. Check your Supabase URL and network connection.'
+          : 'An unexpected error occurred. Please try again.',
+      }
+    }
   }
 
   const signOut = async () => {

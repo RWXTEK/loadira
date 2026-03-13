@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-CarrierShield is a multi-tenant SaaS platform by RWX-TEK INC. Trucking companies sign up, enter their MC number, and receive an auto-generated professional website, carrier profile, and broker packet PDF. The platform pulls carrier data from the FMCSA QCMobile API to populate profiles automatically.
+Loadira is a multi-tenant SaaS platform by RWX-TEK INC. Trucking companies sign up, enter their MC number, and receive an auto-generated professional website, carrier profile, and broker packet PDF. The platform pulls carrier data from the FMCSA QCMobile API to populate profiles automatically.
 
 ## Tech Stack
 

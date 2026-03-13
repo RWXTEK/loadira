@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import {
-  Shield,
   MapPin,
   Phone,
   Mail,
@@ -76,7 +75,7 @@ function Profile() {
       <nav className="border-b border-gray-800/50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Shield className="w-8 h-8 text-orange-500" />
+            <img src="/loadira-logo.png" alt="Loadira" className="w-8 h-8" />
             <span className="text-xl font-bold tracking-tight">{carrier.dbaName || carrier.legalName}</span>
           </div>
           <a
@@ -335,8 +334,8 @@ function Profile() {
       <div className="border-t border-gray-800/50 bg-gray-900/30">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-center gap-2 text-sm text-gray-500">
           <span>Powered by</span>
-          <Shield className="w-4 h-4 text-orange-500" />
-          <span className="font-semibold text-gray-400">CarrierShield</span>
+          <img src="/loadira-logo.png" alt="Loadira" className="w-4 h-4" />
+          <span className="font-semibold text-gray-400">Loadira</span>
         </div>
       </div>
 

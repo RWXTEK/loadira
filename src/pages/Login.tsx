@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Shield, Eye, EyeOff, ArrowRight, Loader2 } from 'lucide-react'
+import { Eye, EyeOff, ArrowRight, Loader2 } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 
 function Login() {
@@ -31,8 +31,8 @@ function Login() {
       <nav className="border-b border-gray-800/50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
-            <Shield className="w-8 h-8 text-orange-500" />
-            <span className="text-xl font-bold tracking-tight">CarrierShield</span>
+            <img src="/loadira-logo.png" alt="Loadira" className="w-8 h-8" />
+            <span className="text-xl font-bold tracking-tight">Loadira</span>
           </Link>
           <p className="text-sm text-gray-400">
             Don't have an account?{' '}
