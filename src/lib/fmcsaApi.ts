@@ -1,10 +1,6 @@
 import { checkRateLimit } from './rateLimit'
 
-// Use proxy in production, direct API in development
-const USE_PROXY = import.meta.env.PROD
 const PROXY_URL = '/.netlify/functions/fmcsa-lookup'
-const DIRECT_BASE_URL = 'https://mobile.fmcsa.dot.gov/qc/services'
-const API_KEY = import.meta.env.VITE_FMCSA_API_KEY || ''
 
 export interface FmcsaCarrier {
   legalName: string
@@ -37,43 +33,20 @@ export interface FmcsaCarrier {
   entityType: string
 }
 
-async function fetchViaProxy(body: Record<string, string>): Promise<Record<string, unknown>> {
+async function fetchJson(body: Record<string, string | undefined>): Promise<Record<string, unknown>> {
   const res = await fetch(PROXY_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
   if (!res.ok) {
-    throw new Error(`FMCSA API error: ${res.status}`)
+    const errorData = await res.json().catch(() => ({}))
+    throw new Error((errorData as Record<string, string>).error || `FMCSA API error: ${res.status}`)
   }
   return res.json()
-}
-
-async function fetchDirect(url: string): Promise<Record<string, unknown>> {
-  const res = await fetch(url)
-  if (!res.ok) {
-    throw new Error(`FMCSA API error: ${res.status}`)
-  }
-  return res.json()
-}
-
-async function fetchJson(params: { mcNumber?: string; dotNumber?: string; endpoint?: string }): Promise<Record<string, unknown>> {
-  if (USE_PROXY) {
-    return fetchViaProxy(params as Record<string, string>)
-  }
-
-  // Direct API call (dev only)
-  const { mcNumber, dotNumber, endpoint } = params
-  const num = (mcNumber || dotNumber || '').replace(/\D/g, '')
-  if (endpoint === 'cargo-carried') return fetchDirect(`${DIRECT_BASE_URL}/carriers/${num}/cargo-carried?webKey=${API_KEY}`)
-  if (endpoint === 'basics') return fetchDirect(`${DIRECT_BASE_URL}/carriers/${num}/basics?webKey=${API_KEY}`)
-  if (endpoint === 'carrier') return fetchDirect(`${DIRECT_BASE_URL}/carriers/${num}?webKey=${API_KEY}`)
-  if (mcNumber) return fetchDirect(`${DIRECT_BASE_URL}/carriers/docket-number/${num}?webKey=${API_KEY}`)
-  throw new Error('Invalid request parameters')
 }
 
 function parseCarrierData(data: Record<string, unknown>): Partial<FmcsaCarrier> {
-  // The API nests carrier info under content[0].carrier
   const content = data.content as Record<string, unknown>[] | undefined
   const carrier = (content?.[0] as Record<string, unknown>)?.carrier as Record<string, unknown> | undefined
 
