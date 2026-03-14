@@ -2,64 +2,65 @@ import { createContext, useContext, useEffect, useState, useCallback } from 'rea
 import type { User, Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 
-// Matches the carriers table in the database
+// Matches the carriers table — only fields we're certain exist
 export interface Carrier {
   id: string
   user_id: string
   mc_number: string
   dot_number: string
   legal_name: string
-  dba_name: string | null
-  entity_type: string | null
-  operating_status: string | null
-  phone: string | null
-  email: string | null
-  address_street: string | null
-  address_city: string | null
-  address_state: string | null
-  address_zip: string | null
-  mailing_street: string | null
-  mailing_city: string | null
-  mailing_state: string | null
-  mailing_zip: string | null
-  safety_rating: string | null
-  safety_rating_date: string | null
-  total_drivers: number | null
-  total_power_units: number | null
-  operation_classification: string[] | null
-  carrier_operation: string[] | null
-  cargo_carried: string[] | null
-  bipd_required: number | null
-  bipd_on_file: number | null
-  bipd_insurer: string | null
-  bipd_policy_number: string | null
-  cargo_required: number | null
-  cargo_on_file: number | null
-  cargo_insurer: string | null
-  cargo_policy_number: string | null
-  bond_required: number | null
-  bond_on_file: number | null
-  vehicle_inspections_total: number | null
-  vehicle_inspections_oos: number | null
-  driver_inspections_total: number | null
-  driver_inspections_oos: number | null
-  hazmat_inspections_total: number | null
-  hazmat_inspections_oos: number | null
-  crashes_fatal: number | null
-  crashes_injury: number | null
-  crashes_towaway: number | null
-  equipment: Record<string, unknown> | null
-  service_lanes: string[] | null
-  company_description: string | null
-  logo_url: string | null
-  brand_color: string
   website_slug: string
-  plan: string
-  stripe_customer_id: string | null
-  stripe_subscription_id: string | null
-  fmcsa_raw: Record<string, unknown> | null
   created_at: string
-  updated_at: string
+  // These may or may not exist as columns depending on DB state
+  dba_name?: string | null
+  entity_type?: string | null
+  operating_status?: string | null
+  phone?: string | null
+  email?: string | null
+  address_street?: string | null
+  address_city?: string | null
+  address_state?: string | null
+  address_zip?: string | null
+  mailing_street?: string | null
+  mailing_city?: string | null
+  mailing_state?: string | null
+  mailing_zip?: string | null
+  safety_rating?: string | null
+  safety_rating_date?: string | null
+  total_drivers?: number | null
+  total_power_units?: number | null
+  operation_classification?: string[] | null
+  carrier_operation?: string[] | null
+  cargo_carried?: string[] | null
+  bipd_required?: number | null
+  bipd_on_file?: number | null
+  bipd_insurer?: string | null
+  bipd_policy_number?: string | null
+  cargo_required?: number | null
+  cargo_on_file?: number | null
+  cargo_insurer?: string | null
+  cargo_policy_number?: string | null
+  bond_required?: number | null
+  bond_on_file?: number | null
+  vehicle_inspections_total?: number | null
+  vehicle_inspections_oos?: number | null
+  driver_inspections_total?: number | null
+  driver_inspections_oos?: number | null
+  hazmat_inspections_total?: number | null
+  hazmat_inspections_oos?: number | null
+  crashes_fatal?: number | null
+  crashes_injury?: number | null
+  crashes_towaway?: number | null
+  equipment?: Record<string, unknown> | null
+  service_lanes?: string[] | null
+  company_description?: string | null
+  logo_url?: string | null
+  brand_color?: string
+  plan?: string
+  stripe_customer_id?: string | null
+  stripe_subscription_id?: string | null
+  fmcsa_raw?: Record<string, unknown> | null
+  updated_at?: string
 }
 
 interface AuthContextType {
@@ -71,6 +72,8 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
   refreshCarrier: () => Promise<void>
+  resetPassword: (email: string) => Promise<{ error: string | null }>
+  updatePassword: (newPassword: string) => Promise<{ error: string | null }>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -133,21 +136,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         },
       })
       if (error) {
-        const msg = error.message === 'Failed to fetch'
-          ? 'Unable to connect to the server. Please check your internet connection and verify the Supabase project URL is correct in .env.local.'
-          : error.message
-        return { error: msg, userId: null, hasSession: false }
+        if (error.message === 'Failed to fetch') {
+          return { error: 'Unable to connect. Please check your internet connection and try again.', userId: null, hasSession: false }
+        }
+        return { error: error.message, userId: null, hasSession: false }
       }
       return {
         error: null,
         userId: data?.user?.id ?? null,
         hasSession: !!data?.session,
       }
-    } catch (err) {
+    } catch {
       return {
-        error: err instanceof Error && err.message === 'Failed to fetch'
-          ? 'Unable to connect to the server. Check your Supabase URL and network connection.'
-          : 'An unexpected error occurred. Please try again.',
+        error: 'Unable to connect. Please check your internet connection and try again.',
         userId: null,
         hasSession: false,
       }
@@ -158,18 +159,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) {
-        const msg = error.message === 'Failed to fetch'
-          ? 'Unable to connect to the server. Please check your internet connection and verify the Supabase project URL is correct in .env.local.'
-          : error.message
-        return { error: msg }
+        if (error.message === 'Failed to fetch') {
+          return { error: 'Unable to connect. Please check your internet connection and try again.' }
+        }
+        if (error.message === 'Invalid login credentials') {
+          return { error: 'Invalid email or password.' }
+        }
+        if (error.message === 'Email not confirmed') {
+          return { error: 'Please check your email and confirm your account before logging in.' }
+        }
+        return { error: error.message }
       }
       return { error: null }
-    } catch (err) {
-      return {
-        error: err instanceof Error && err.message === 'Failed to fetch'
-          ? 'Unable to connect to the server. Check your Supabase URL and network connection.'
-          : 'An unexpected error occurred. Please try again.',
+    } catch {
+      return { error: 'Unable to connect. Please check your internet connection and try again.' }
+    }
+  }
+
+  const resetPassword = async (email: string) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      })
+      if (error) {
+        if (error.message === 'Failed to fetch') {
+          return { error: 'Unable to connect. Please check your internet connection and try again.' }
+        }
+        return { error: error.message }
       }
+      return { error: null }
+    } catch {
+      return { error: 'Unable to connect. Please check your internet connection and try again.' }
+    }
+  }
+
+  const updatePassword = async (newPassword: string) => {
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword })
+      if (error) {
+        if (error.message === 'Failed to fetch') {
+          return { error: 'Unable to connect. Please check your internet connection and try again.' }
+        }
+        return { error: error.message }
+      }
+      return { error: null }
+    } catch {
+      return { error: 'Unable to connect. Please check your internet connection and try again.' }
     }
   }
 
@@ -180,7 +215,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, session, carrier, loading, signUp, signIn, signOut, refreshCarrier }}
+      value={{ user, session, carrier, loading, signUp, signIn, signOut, refreshCarrier, resetPassword, updatePassword }}
     >
       {children}
     </AuthContext.Provider>

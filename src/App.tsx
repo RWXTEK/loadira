@@ -7,6 +7,7 @@ import Profile from './pages/Profile'
 import BrokerPacket from './pages/BrokerPacket'
 import Pricing from './pages/Pricing'
 import Settings from './pages/Settings'
+import ResetPassword from './pages/ResetPassword'
 import ProtectedRoute from './components/ProtectedRoute'
 import ErrorBoundary from './components/ErrorBoundary'
 
@@ -18,6 +19,7 @@ function App() {
         <Route path="/signup" element={<Signup />} />
         <Route path="/login" element={<Login />} />
         <Route path="/pricing" element={<Pricing />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/profile/:slug" element={<Profile />} />
         <Route
           path="/dashboard"
