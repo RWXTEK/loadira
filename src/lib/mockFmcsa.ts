@@ -169,27 +169,34 @@ function oosRate(total: number | null | undefined, oos: number | null | undefine
   return t > 0 ? Math.round((o / t) * 1000) / 10 : 0
 }
 
-// Build a CarrierData display object from a carriers DB row, falling back to mockCarrier
+// Build a CarrierData display object from a carriers DB row.
+// Reads from individual columns first, falls back to fmcsa_raw, then to mockCarrier.
 export function buildCarrierDisplay(row: Carrier | null): CarrierData {
   if (!row) return mockCarrier
+
+  // Extract fmcsa_raw data as fallback source
+  const raw = (row.fmcsa_raw || {}) as Record<string, unknown>
+  const rawAddr = (raw.physicalAddress || {}) as Record<string, string>
+  const rawIns = (raw.insuranceData || {}) as Record<string, unknown>
+  const rawCargo = (raw.cargoCarried || []) as string[]
 
   const eq = (row.equipment || {}) as Record<string, number>
 
   return {
     legalName: row.legal_name || mockCarrier.legalName,
-    dbaName: row.dba_name || mockCarrier.dbaName,
+    dbaName: row.dba_name || (raw.dbaName as string) || mockCarrier.dbaName,
     mcNumber: row.mc_number ? `MC-${row.mc_number}` : mockCarrier.mcNumber,
     dotNumber: row.dot_number || mockCarrier.dotNumber,
-    entityType: row.entity_type || mockCarrier.entityType,
-    operatingStatus: row.operating_status || mockCarrier.operatingStatus,
+    entityType: row.entity_type || (raw.entityType as string) || mockCarrier.entityType,
+    operatingStatus: row.operating_status || (raw.operatingStatus as string) || mockCarrier.operatingStatus,
     outOfServiceDate: null,
     address: {
-      street: row.address_street || mockCarrier.address.street,
-      city: row.address_city || mockCarrier.address.city,
-      state: row.address_state || mockCarrier.address.state,
-      zip: row.address_zip || mockCarrier.address.zip,
+      street: row.address_street || rawAddr.street || mockCarrier.address.street,
+      city: row.address_city || rawAddr.city || mockCarrier.address.city,
+      state: row.address_state || rawAddr.state || mockCarrier.address.state,
+      zip: row.address_zip || rawAddr.zip || mockCarrier.address.zip,
     },
-    phone: row.phone || mockCarrier.phone,
+    phone: row.phone || (raw.phone as string) || mockCarrier.phone,
     email: row.email || mockCarrier.email,
     mailingAddress: {
       street: row.mailing_street || mockCarrier.mailingAddress.street,
@@ -197,24 +204,24 @@ export function buildCarrierDisplay(row: Carrier | null): CarrierData {
       state: row.mailing_state || mockCarrier.mailingAddress.state,
       zip: row.mailing_zip || mockCarrier.mailingAddress.zip,
     },
-    safetyRating: row.safety_rating || mockCarrier.safetyRating,
+    safetyRating: row.safety_rating || (raw.safetyRating as string) || mockCarrier.safetyRating,
     safetyRatingDate: row.safety_rating_date || mockCarrier.safetyRatingDate,
-    totalDrivers: row.total_drivers ?? mockCarrier.totalDrivers,
-    totalPowerUnits: row.total_power_units ?? mockCarrier.totalPowerUnits,
+    totalDrivers: row.total_drivers ?? (raw.drivers as number) ?? mockCarrier.totalDrivers,
+    totalPowerUnits: row.total_power_units ?? (raw.powerUnits as number) ?? mockCarrier.totalPowerUnits,
     operationClassification: row.operation_classification || mockCarrier.operationClassification,
     carrierOperation: row.carrier_operation || mockCarrier.carrierOperation,
-    cargoCarried: row.cargo_carried || mockCarrier.cargoCarried,
+    cargoCarried: row.cargo_carried || (rawCargo.length > 0 ? rawCargo : null) || mockCarrier.cargoCarried,
     insurance: {
-      bipdRequired: row.bipd_required ?? mockCarrier.insurance.bipdRequired,
-      bipdOnFile: row.bipd_on_file ?? mockCarrier.insurance.bipdOnFile,
-      bipdInsurer: row.bipd_insurer || mockCarrier.insurance.bipdInsurer,
+      bipdRequired: row.bipd_required ?? (Number(rawIns.bipdRequired) || mockCarrier.insurance.bipdRequired),
+      bipdOnFile: row.bipd_on_file ?? (Number(rawIns.bipdOnFile) || mockCarrier.insurance.bipdOnFile),
+      bipdInsurer: row.bipd_insurer || String(rawIns.bipdInsurer || '') || mockCarrier.insurance.bipdInsurer,
       bipdPolicyNumber: row.bipd_policy_number || mockCarrier.insurance.bipdPolicyNumber,
-      cargoRequired: row.cargo_required ?? mockCarrier.insurance.cargoRequired,
-      cargoOnFile: row.cargo_on_file ?? mockCarrier.insurance.cargoOnFile,
-      cargoInsurer: row.cargo_insurer || mockCarrier.insurance.cargoInsurer,
+      cargoRequired: row.cargo_required ?? (Number(rawIns.cargoRequired) || mockCarrier.insurance.cargoRequired),
+      cargoOnFile: row.cargo_on_file ?? (Number(rawIns.cargoOnFile) || mockCarrier.insurance.cargoOnFile),
+      cargoInsurer: row.cargo_insurer || String(rawIns.cargoInsurer || '') || mockCarrier.insurance.cargoInsurer,
       cargoPolicyNumber: row.cargo_policy_number || mockCarrier.insurance.cargoPolicyNumber,
       bondRequired: row.bond_required ?? mockCarrier.insurance.bondRequired,
-      bondOnFile: row.bond_on_file ?? mockCarrier.insurance.bondOnFile,
+      bondOnFile: row.bond_on_file ?? (Number(rawIns.bondOnFile) || mockCarrier.insurance.bondOnFile),
     },
     inspections: {
       vehicleTotal: row.vehicle_inspections_total ?? mockCarrier.inspections.vehicleTotal,

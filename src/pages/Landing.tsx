@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FileText, Globe, ChevronRight, Star, Zap, Clock, Loader2, CheckCircle, Users, MapPin, ArrowRight, Shield, Truck } from 'lucide-react'
 import { lookupByMcNumber } from '../lib/fmcsaApi'
+import { sanitizeMcNumber } from '../lib/sanitize'
 import LoadiraLogo from '../components/LoadiraLogo'
 import type { FmcsaCarrier } from '../lib/fmcsaApi'
 
@@ -14,11 +15,12 @@ function Landing() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!mcNumber.trim()) return
+    const cleaned = sanitizeMcNumber(mcNumber)
+    if (!cleaned) return
 
     // If we already have a carrier preview, go to signup
     if (carrier) {
-      navigate(`/signup?mc=${encodeURIComponent(mcNumber.trim())}`)
+      navigate(`/signup?mc=${encodeURIComponent(cleaned)}`)
       return
     }
 
@@ -26,10 +28,11 @@ function Landing() {
     setLookupError('')
 
     try {
-      const data = await lookupByMcNumber(mcNumber.trim())
+      const data = await lookupByMcNumber(cleaned)
       setCarrier(data)
-    } catch {
-      setLookupError('Carrier not found. Please check your MC number and try again.')
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Carrier not found.'
+      setLookupError(message.includes('Rate limit') ? message : 'Carrier not found. Please check your MC number and try again.')
     } finally {
       setIsLooking(false)
     }
@@ -86,9 +89,11 @@ function Landing() {
                 <Truck className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
                 <input
                   type="text"
+                  inputMode="numeric"
+                  maxLength={7}
                   value={mcNumber}
                   onChange={(e) => {
-                    setMcNumber(e.target.value)
+                    setMcNumber(sanitizeMcNumber(e.target.value))
                     setLookupError('')
                     setCarrier(null)
                   }}
@@ -267,8 +272,10 @@ function Landing() {
           <form onSubmit={handleSubmit} className="max-w-md mx-auto flex flex-col sm:flex-row gap-3">
             <input
               type="text"
+              inputMode="numeric"
+              maxLength={7}
               value={mcNumber}
-              onChange={(e) => setMcNumber(e.target.value)}
+              onChange={(e) => setMcNumber(sanitizeMcNumber(e.target.value))}
               placeholder="MC number"
               className="flex-1 px-4 py-3 bg-gray-900 border border-gray-700 rounded-xl text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
             />

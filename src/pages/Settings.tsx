@@ -16,6 +16,7 @@ import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
+import { sanitizeText, sanitizeHexColor, sanitizeForDb } from '../lib/sanitize'
 
 function Settings() {
   const { carrier, refreshCarrier } = useAuth()
@@ -41,11 +42,15 @@ function Settings() {
     setSaved(false)
 
     if (carrier) {
+      const existing = (carrier.fmcsa_raw || {}) as Record<string, unknown>
+      const updateData = sanitizeForDb({
+        brandColor: sanitizeHexColor(primaryColor),
+        companyDescription: sanitizeText(heroText, 1000),
+      } as Record<string, unknown>)
       await supabase
         .from('carriers')
         .update({
-          brand_color: primaryColor,
-          company_description: heroText,
+          fmcsa_raw: { ...existing, ...updateData },
         })
         .eq('id', carrier.id)
     }
@@ -156,7 +161,7 @@ function Settings() {
                 <input
                   type="text"
                   value={primaryColor}
-                  onChange={(e) => setPrimaryColor(e.target.value)}
+                  onChange={(e) => setPrimaryColor(sanitizeHexColor(e.target.value))}
                   className="w-28 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white font-mono focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                 />
               </div>
@@ -171,7 +176,7 @@ function Settings() {
           >
             <textarea
               value={heroText}
-              onChange={(e) => setHeroText(e.target.value)}
+              onChange={(e) => setHeroText(sanitizeText(e.target.value, 1000))}
               rows={5}
               className="w-full px-4 py-3.5 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all resize-none"
             />
@@ -202,7 +207,7 @@ function Settings() {
                 <input
                   type="text"
                   value={newLane}
-                  onChange={(e) => setNewLane(e.target.value)}
+                  onChange={(e) => setNewLane(sanitizeText(e.target.value, 100))}
                   onKeyDown={(e) => e.key === 'Enter' && addLane()}
                   placeholder="e.g. Texas to California"
                   className="flex-1 px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"

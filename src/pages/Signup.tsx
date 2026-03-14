@@ -5,6 +5,7 @@ import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
 import { lookupByMcNumber } from '../lib/fmcsaApi'
 import type { FmcsaCarrier } from '../lib/fmcsaApi'
+import { sanitizeMcNumber, isValidMcNumber, isValidEmail, isValidPassword, getPasswordErrors, sanitizeText, sanitizeForDb } from '../lib/sanitize'
 import LoadiraLogo from '../components/LoadiraLogo'
 
 type Step = 'mc' | 'account' | 'confirm'
@@ -14,7 +15,7 @@ function Signup() {
   const navigate = useNavigate()
   const { signUp } = useAuth()
   const [step, setStep] = useState<Step>('mc')
-  const [mcNumber, setMcNumber] = useState(searchParams.get('mc') || '')
+  const [mcNumber, setMcNumber] = useState(sanitizeMcNumber(searchParams.get('mc') || ''))
   const [isLookingUp, setIsLookingUp] = useState(false)
   const [lookupError, setLookupError] = useState('')
   const [fmcsaResult, setFmcsaResult] = useState<FmcsaCarrier | null>(null)
@@ -36,17 +37,24 @@ function Signup() {
   }, [])
 
   const handleMcLookup = async () => {
-    if (!mcNumber.trim()) return
+    const cleaned = sanitizeMcNumber(mcNumber)
+    if (!cleaned) return
+
+    if (!isValidMcNumber(cleaned)) {
+      setLookupError('MC number must be 1-7 digits.')
+      return
+    }
 
     setIsLookingUp(true)
     setLookupError('')
 
     try {
-      const data = await lookupByMcNumber(mcNumber.trim())
+      const data = await lookupByMcNumber(cleaned)
       setFmcsaResult(data)
       setStep('account')
-    } catch {
-      setLookupError('Carrier not found. Please check your MC number and try again.')
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Carrier not found.'
+      setLookupError(message.includes('Rate limit') ? message : 'Carrier not found. Please check your MC number and try again.')
     } finally {
       setIsLookingUp(false)
     }
@@ -56,11 +64,29 @@ function Signup() {
     e.preventDefault()
     if (!agreedToTerms || !fmcsaResult) return
 
+    // Validate inputs
+    const cleanName = sanitizeText(fullName, 100)
+    const cleanEmail = email.trim()
+
+    if (!cleanName) {
+      setSignupError('Please enter your full name.')
+      return
+    }
+    if (!isValidEmail(cleanEmail)) {
+      setSignupError('Please enter a valid email address.')
+      return
+    }
+    if (!isValidPassword(password)) {
+      const errors = getPasswordErrors(password)
+      setSignupError('Password requirements: ' + errors.join(', ') + '.')
+      return
+    }
+
     setIsSubmitting(true)
     setSignupError('')
 
     // 1. Create the auth account
-    const { error, userId, hasSession } = await signUp(email, password, fullName)
+    const { error, userId, hasSession } = await signUp(cleanEmail, password, cleanName)
 
     if (error) {
       setSignupError(error)
@@ -75,34 +101,31 @@ function Signup() {
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/(^-|-$)/g, '')
 
+      // Sanitize all FMCSA data before DB insert
+      const fmcsaRaw = sanitizeForDb({
+        dbaName: fmcsaResult.dbaName,
+        entityType: fmcsaResult.entityType,
+        operatingStatus: fmcsaResult.operatingStatus,
+        phone: fmcsaResult.phone,
+        physicalAddress: fmcsaResult.physicalAddress,
+        safetyRating: fmcsaResult.safetyRating,
+        drivers: fmcsaResult.drivers,
+        powerUnits: fmcsaResult.powerUnits,
+        cargoCarried: fmcsaResult.cargoCarried,
+        insuranceData: fmcsaResult.insuranceData,
+        boc3OnFile: fmcsaResult.boc3OnFile,
+        basicsScores: fmcsaResult.basicsScores,
+      } as Record<string, unknown>)
+
       const { error: carrierError } = await supabase
         .from('carriers')
         .insert({
           user_id: userId,
-          mc_number: mcNumber.trim(),
-          dot_number: fmcsaResult.dotNumber,
-          legal_name: fmcsaResult.legalName,
-          dba_name: fmcsaResult.dbaName || null,
-          entity_type: fmcsaResult.entityType || null,
-          operating_status: fmcsaResult.operatingStatus || null,
-          phone: fmcsaResult.phone || null,
-          address_street: fmcsaResult.physicalAddress.street || null,
-          address_city: fmcsaResult.physicalAddress.city || null,
-          address_state: fmcsaResult.physicalAddress.state || null,
-          address_zip: fmcsaResult.physicalAddress.zip || null,
-          safety_rating: fmcsaResult.safetyRating || null,
-          total_drivers: fmcsaResult.drivers || null,
-          total_power_units: fmcsaResult.powerUnits || null,
-          cargo_carried: fmcsaResult.cargoCarried.length > 0 ? fmcsaResult.cargoCarried : null,
-          bipd_required: fmcsaResult.insuranceData.bipdRequired || null,
-          bipd_on_file: fmcsaResult.insuranceData.bipdOnFile || null,
-          bipd_insurer: fmcsaResult.insuranceData.bipdInsurer || null,
-          cargo_required: fmcsaResult.insuranceData.cargoRequired || null,
-          cargo_on_file: fmcsaResult.insuranceData.cargoOnFile || null,
-          cargo_insurer: fmcsaResult.insuranceData.cargoInsurer || null,
-          bond_on_file: fmcsaResult.insuranceData.bondOnFile || null,
+          mc_number: sanitizeMcNumber(mcNumber),
+          dot_number: fmcsaResult.dotNumber.replace(/\D/g, ''),
+          legal_name: sanitizeText(fmcsaResult.legalName, 200),
           website_slug: slug,
-          brand_color: '#f97316',
+          fmcsa_raw: fmcsaRaw,
         })
 
       if (carrierError) {
@@ -170,9 +193,11 @@ function Signup() {
                     <input
                       id="mc-number"
                       type="text"
+                      inputMode="numeric"
+                      maxLength={7}
                       value={mcNumber}
                       onChange={(e) => {
-                        setMcNumber(e.target.value)
+                        setMcNumber(sanitizeMcNumber(e.target.value))
                         setLookupError('')
                       }}
                       onKeyDown={(e) => e.key === 'Enter' && handleMcLookup()}
@@ -272,9 +297,10 @@ function Signup() {
                       id="full-name"
                       type="text"
                       value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
+                      onChange={(e) => setFullName(sanitizeText(e.target.value, 100))}
                       placeholder="John Smith"
                       required
+                      maxLength={100}
                       className="w-full px-4 py-3.5 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
                     />
                   </div>
@@ -292,6 +318,9 @@ function Signup() {
                       required
                       className="w-full px-4 py-3.5 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
                     />
+                    {email && !isValidEmail(email) && (
+                      <p className="text-yellow-400 text-xs mt-1">Please enter a valid email address.</p>
+                    )}
                   </div>
 
                   <div>
@@ -304,7 +333,7 @@ function Signup() {
                         type={showPassword ? 'text' : 'password'}
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        placeholder="At least 8 characters"
+                        placeholder="Min 8 chars, 1 uppercase, 1 number"
                         required
                         minLength={8}
                         className="w-full px-4 pr-12 py-3.5 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
@@ -317,6 +346,11 @@ function Signup() {
                         {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                       </button>
                     </div>
+                    {password && !isValidPassword(password) && (
+                      <p className="text-yellow-400 text-xs mt-1">
+                        Needs: {getPasswordErrors(password).join(', ')}
+                      </p>
+                    )}
                   </div>
 
                   <div className="flex items-start gap-3 pt-1">
@@ -341,7 +375,7 @@ function Signup() {
 
                   <button
                     type="submit"
-                    disabled={!fullName || !email || !password || !agreedToTerms || isSubmitting}
+                    disabled={!fullName || !email || !password || !agreedToTerms || isSubmitting || !isValidEmail(email) || !isValidPassword(password)}
                     className="w-full flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 disabled:bg-orange-500/50 disabled:cursor-not-allowed text-white font-semibold py-3.5 rounded-xl transition-all cursor-pointer"
                   >
                     {isSubmitting ? (

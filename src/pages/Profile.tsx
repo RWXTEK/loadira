@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import Footer from '../components/Footer'
 import { supabase } from '../lib/supabase'
+import { sanitizeText, isValidEmail, sanitizeForDb } from '../lib/sanitize'
 import { mockCarrier, buildCarrierDisplay, getSafetyRatingColor, formatCurrency } from '../lib/mockFmcsa'
 import type { Carrier } from '../hooks/useAuth'
 import LoadiraLogo from '../components/LoadiraLogo'
@@ -420,17 +421,30 @@ function QuoteForm({ carrierId }: { carrierId: string }) {
   const [submitted, setSubmitted] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
+  const [formError, setFormError] = useState('')
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setFormError('')
+
+    const cleanName = sanitizeText(name, 100)
+    const cleanEmail = email.trim()
+    const cleanDetails = sanitizeText(details, 2000)
+
+    if (!cleanName) { setFormError('Please enter your name.'); return }
+    if (!isValidEmail(cleanEmail)) { setFormError('Please enter a valid email.'); return }
+    if (!cleanDetails) { setFormError('Please enter shipment details.'); return }
+
     setIsLoading(true)
 
     if (carrierId) {
-      await supabase.from('quote_requests').insert({
+      const sanitizedData = sanitizeForDb({
         carrier_id: carrierId,
-        name,
-        email,
-        details,
-      })
+        name: cleanName,
+        email: cleanEmail,
+        details: cleanDetails,
+      } as Record<string, unknown>)
+      await supabase.from('quote_requests').insert(sanitizedData)
     }
 
     setIsLoading(false)
@@ -449,12 +463,14 @@ function QuoteForm({ carrierId }: { carrierId: string }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {formError && <p className="text-red-400 text-sm">{formError}</p>}
       <input
         type="text"
         placeholder="Your name"
         value={name}
-        onChange={(e) => setName(e.target.value)}
+        onChange={(e) => setName(sanitizeText(e.target.value, 100))}
         required
+        maxLength={100}
         className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
       />
       <input
@@ -468,9 +484,10 @@ function QuoteForm({ carrierId }: { carrierId: string }) {
       <textarea
         placeholder="Shipment details (origin, destination, freight type...)"
         value={details}
-        onChange={(e) => setDetails(e.target.value)}
+        onChange={(e) => setDetails(sanitizeText(e.target.value, 2000))}
         rows={4}
         required
+        maxLength={2000}
         className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all resize-none"
       />
       <button

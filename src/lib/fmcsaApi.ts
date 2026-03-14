@@ -1,4 +1,9 @@
-const BASE_URL = 'https://mobile.fmcsa.dot.gov/qc/services'
+import { checkRateLimit } from './rateLimit'
+
+// Use proxy in production, direct API in development
+const USE_PROXY = import.meta.env.PROD
+const PROXY_URL = '/.netlify/functions/fmcsa-lookup'
+const DIRECT_BASE_URL = 'https://mobile.fmcsa.dot.gov/qc/services'
 const API_KEY = import.meta.env.VITE_FMCSA_API_KEY || ''
 
 export interface FmcsaCarrier {
@@ -32,12 +37,39 @@ export interface FmcsaCarrier {
   entityType: string
 }
 
-async function fetchJson(url: string) {
+async function fetchViaProxy(body: Record<string, string>): Promise<Record<string, unknown>> {
+  const res = await fetch(PROXY_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    throw new Error(`FMCSA API error: ${res.status}`)
+  }
+  return res.json()
+}
+
+async function fetchDirect(url: string): Promise<Record<string, unknown>> {
   const res = await fetch(url)
   if (!res.ok) {
     throw new Error(`FMCSA API error: ${res.status}`)
   }
   return res.json()
+}
+
+async function fetchJson(params: { mcNumber?: string; dotNumber?: string; endpoint?: string }): Promise<Record<string, unknown>> {
+  if (USE_PROXY) {
+    return fetchViaProxy(params as Record<string, string>)
+  }
+
+  // Direct API call (dev only)
+  const { mcNumber, dotNumber, endpoint } = params
+  const num = (mcNumber || dotNumber || '').replace(/\D/g, '')
+  if (endpoint === 'cargo-carried') return fetchDirect(`${DIRECT_BASE_URL}/carriers/${num}/cargo-carried?webKey=${API_KEY}`)
+  if (endpoint === 'basics') return fetchDirect(`${DIRECT_BASE_URL}/carriers/${num}/basics?webKey=${API_KEY}`)
+  if (endpoint === 'carrier') return fetchDirect(`${DIRECT_BASE_URL}/carriers/${num}?webKey=${API_KEY}`)
+  if (mcNumber) return fetchDirect(`${DIRECT_BASE_URL}/carriers/docket-number/${num}?webKey=${API_KEY}`)
+  throw new Error('Invalid request parameters')
 }
 
 function parseCarrierData(data: Record<string, unknown>): Partial<FmcsaCarrier> {
@@ -99,14 +131,22 @@ function parseBasicsScores(data: Record<string, unknown>): Record<string, number
   return scores
 }
 
+function enforceRateLimit() {
+  const { allowed, retryAfterMs } = checkRateLimit()
+  if (!allowed) {
+    const seconds = Math.ceil(retryAfterMs / 1000)
+    throw new Error(`Rate limit exceeded. Please wait ${seconds} seconds before trying again.`)
+  }
+}
+
 export async function lookupByMcNumber(mcNumber: string): Promise<FmcsaCarrier> {
   const cleanMc = mcNumber.replace(/\D/g, '')
-  if (!cleanMc) throw new Error('Invalid MC number')
+  if (!cleanMc || cleanMc.length > 7) throw new Error('Invalid MC number')
+
+  enforceRateLimit()
 
   // Step 1: Look up by MC/docket number to get DOT number
-  const mcData = await fetchJson(
-    `${BASE_URL}/carriers/docket-number/${cleanMc}?webKey=${API_KEY}`
-  )
+  const mcData = await fetchJson({ mcNumber: cleanMc })
 
   const partial = parseCarrierData(mcData)
   if (!partial.dotNumber) {
@@ -115,8 +155,8 @@ export async function lookupByMcNumber(mcNumber: string): Promise<FmcsaCarrier> 
 
   // Step 2: Fetch cargo and BASICS in parallel using DOT number
   const [cargoData, basicsData] = await Promise.allSettled([
-    fetchJson(`${BASE_URL}/carriers/${partial.dotNumber}/cargo-carried?webKey=${API_KEY}`),
-    fetchJson(`${BASE_URL}/carriers/${partial.dotNumber}/basics?webKey=${API_KEY}`),
+    fetchJson({ dotNumber: partial.dotNumber, endpoint: 'cargo-carried' }),
+    fetchJson({ dotNumber: partial.dotNumber, endpoint: 'basics' }),
   ])
 
   const cargoCarried = cargoData.status === 'fulfilled' ? parseCargoCarried(cargoData.value) : []
@@ -148,11 +188,13 @@ export async function lookupByDotNumber(dotNumber: string): Promise<FmcsaCarrier
   const cleanDot = dotNumber.replace(/\D/g, '')
   if (!cleanDot) throw new Error('Invalid DOT number')
 
+  enforceRateLimit()
+
   // Fetch carrier, cargo, and BASICS in parallel
   const [carrierData, cargoData, basicsData] = await Promise.allSettled([
-    fetchJson(`${BASE_URL}/carriers/${cleanDot}?webKey=${API_KEY}`),
-    fetchJson(`${BASE_URL}/carriers/${cleanDot}/cargo-carried?webKey=${API_KEY}`),
-    fetchJson(`${BASE_URL}/carriers/${cleanDot}/basics?webKey=${API_KEY}`),
+    fetchJson({ dotNumber: cleanDot, endpoint: 'carrier' }),
+    fetchJson({ dotNumber: cleanDot, endpoint: 'cargo-carried' }),
+    fetchJson({ dotNumber: cleanDot, endpoint: 'basics' }),
   ])
 
   if (carrierData.status === 'rejected') {
