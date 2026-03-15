@@ -1,63 +1,111 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
-import { Check, X, Zap, Shield, Loader2 } from 'lucide-react'
+import { supabase } from '../lib/supabase'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
-import { useAuth } from '../hooks/useAuth'
-import { useSubscription } from '../hooks/useSubscription'
 
-interface PlanFeature {
-  text: string
-  starter: boolean
-  professional: boolean
-  fleet: boolean
-}
-
-const features: PlanFeature[] = [
-  { text: 'Professional carrier website', starter: true, professional: true, fleet: true },
-  { text: 'FMCSA data auto-populated', starter: true, professional: true, fleet: true },
-  { text: 'Broker packet PDF', starter: true, professional: true, fleet: true },
-  { text: 'Public carrier profile', starter: true, professional: true, fleet: true },
-  { text: 'Mobile-responsive design', starter: true, professional: true, fleet: true },
-  { text: 'SSL certificate', starter: true, professional: true, fleet: true },
-  { text: 'Custom company description', starter: false, professional: true, fleet: true },
-  { text: 'Logo upload & branding', starter: false, professional: true, fleet: true },
-  { text: 'Service lane customization', starter: false, professional: true, fleet: true },
-  { text: 'Request a Quote form', starter: false, professional: true, fleet: true },
-  { text: 'Document uploads', starter: false, professional: true, fleet: true },
-  { text: 'FMCSA data auto-refresh', starter: false, professional: true, fleet: true },
-  { text: 'Custom domain', starter: false, professional: false, fleet: true },
-  { text: 'Multiple user accounts', starter: false, professional: false, fleet: true },
-  { text: 'Priority support', starter: false, professional: false, fleet: true },
-  { text: 'Analytics dashboard', starter: false, professional: false, fleet: true },
-  { text: 'API access', starter: false, professional: false, fleet: true },
-  { text: 'White-label branding', starter: false, professional: false, fleet: true },
+const PLANS = [
+  {
+    id: 'starter',
+    name: 'Starter',
+    price: 49,
+    priceId: import.meta.env.VITE_STRIPE_PRICE_STARTER,
+    description: 'Get your carrier online fast',
+    highlight: false,
+    features: [
+      '1 carrier website',
+      'FMCSA QCMobile verification',
+      'Professional DOT/MC display',
+      'SSL + hosting included',
+      'Basic contact form',
+      'Mobile responsive',
+    ],
+    cta: 'Get Started',
+    badge: null,
+  },
+  {
+    id: 'professional',
+    name: 'Professional',
+    price: 99,
+    priceId: import.meta.env.VITE_STRIPE_PRICE_PROFESSIONAL,
+    description: 'Built for SBA loan applications & broker onboarding',
+    highlight: true,
+    features: [
+      'Everything in Starter',
+      'SBA-ready compliance page',
+      'Safety score display (CSA)',
+      'Insurance certificate upload',
+      'Broker portal integration',
+      'Custom domain support',
+      'Priority support',
+    ],
+    cta: 'Start Free Trial',
+    badge: 'Most Popular',
+  },
+  {
+    id: 'fleet',
+    name: 'Fleet',
+    price: 199,
+    priceId: import.meta.env.VITE_STRIPE_PRICE_FLEET,
+    description: 'Multi-carrier management for dispatchers & fleets',
+    highlight: false,
+    features: [
+      'Everything in Professional',
+      'Up to 10 carrier websites',
+      'Bulk FMCSA verification',
+      'White-label branding',
+      'API access',
+      'Dedicated account manager',
+      'SLA guarantee',
+    ],
+    cta: 'Contact Sales',
+    badge: null,
+  },
 ]
 
-const PRICE_IDS = {
-  starter: {
-    monthly: import.meta.env.VITE_STRIPE_PRICE_STARTER || '',
-    yearly: import.meta.env.VITE_STRIPE_PRICE_STARTER_ANNUAL || '',
-  },
-  professional: {
-    monthly: import.meta.env.VITE_STRIPE_PRICE_PROFESSIONAL || '',
-    yearly: import.meta.env.VITE_STRIPE_PRICE_PROFESSIONAL_ANNUAL || '',
-  },
-  fleet: {
-    monthly: import.meta.env.VITE_STRIPE_PRICE_FLEET || '',
-    yearly: import.meta.env.VITE_STRIPE_PRICE_FLEET_ANNUAL || '',
-  },
-}
-
-const PRICES = {
-  starter: { monthly: 49, yearly: 470 },
-  professional: { monthly: 99, yearly: 950 },
-  fleet: { monthly: 199, yearly: 1990 },
-}
-
 function Pricing() {
+  const [loading, setLoading] = useState<string | null>(null)
   const [annual, setAnnual] = useState(false)
-  const { user } = useAuth()
+
+  const getPrice = (base: number) =>
+    annual ? Math.round(base * 12 * 0.8) : base
+
+  const handleCheckout = async (plan: (typeof PLANS)[0]) => {
+    if (plan.id === 'fleet') {
+      window.location.href = 'mailto:customertek@rwxtek.com?subject=CarrierShield Fleet Inquiry'
+      return
+    }
+
+    setLoading(plan.id)
+
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      if (!session) {
+        window.location.href = '/login?redirect=/pricing'
+        return
+      }
+
+      const { data, error } = await supabase.functions.invoke('create-checkout', {
+        body: {
+          priceId: plan.priceId,
+          planId: plan.id,
+          annual,
+          successUrl: `${window.location.origin}/dashboard?checkout=success`,
+          cancelUrl: `${window.location.origin}/pricing`,
+        },
+      })
+
+      if (error) throw error
+      if (data?.url) window.location.href = data.url
+    } catch (err) {
+      console.error('Checkout error:', err)
+      alert('Something went wrong. Please try again or contact customertek@rwxtek.com')
+    } finally {
+      setLoading(null)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-950 text-white flex flex-col">
@@ -65,158 +113,152 @@ function Pricing() {
 
       <main className="flex-1">
         {/* Header */}
-        <section className="relative overflow-hidden">
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
-          <div className="relative max-w-4xl mx-auto px-6 pt-20 pb-16 text-center">
-            <div className="inline-flex items-center gap-2 bg-orange-500/10 border border-orange-500/20 rounded-full px-4 py-1.5 mb-6">
-              <Zap className="w-4 h-4 text-orange-500" />
-              <span className="text-sm text-orange-400 font-medium">14-day free trial on all plans</span>
-            </div>
-            <h1 className="text-4xl md:text-5xl font-bold mb-4">
-              Plans that scale with your <span className="text-orange-500">fleet</span>
-            </h1>
-            <p className="text-xl text-gray-400 max-w-2xl mx-auto mb-8">
-              Start with a free trial. Upgrade when you need more. No hidden fees, cancel anytime.
-            </p>
-
-            {/* Billing Toggle */}
-            <div className="inline-flex items-center gap-3 bg-gray-900 border border-gray-800 rounded-full p-1">
-              <button
-                onClick={() => setAnnual(false)}
-                className={`text-sm font-medium px-5 py-2 rounded-full transition-all cursor-pointer ${
-                  !annual ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                Monthly
-              </button>
-              <button
-                onClick={() => setAnnual(true)}
-                className={`text-sm font-medium px-5 py-2 rounded-full transition-all cursor-pointer ${
-                  annual ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                Annual
-                <span className="ml-1.5 text-[11px] text-emerald-400 font-semibold">Save 20%</span>
-              </button>
-            </div>
+        <div className="max-w-6xl mx-auto px-6 pt-20 pb-16 text-center">
+          <div className="inline-flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 rounded-full px-4 py-1.5 mb-6">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+            <span className="text-amber-400 text-sm font-medium tracking-wide">
+              FMCSA Verified Carrier Websites
+            </span>
           </div>
-        </section>
+
+          <h1 className="text-5xl font-black tracking-tight mb-4">
+            ONE PRICE.
+            <br />
+            <span className="text-amber-400">BROKER-READY</span> IN 24 HOURS.
+          </h1>
+
+          <p className="text-gray-400 text-lg max-w-xl mx-auto mb-10">
+            Professional carrier websites with live FMCSA verification. Built to
+            impress brokers, pass SBA reviews, and win more freight.
+          </p>
+
+          {/* Billing Toggle */}
+          <div className="inline-flex items-center gap-4 bg-gray-900 rounded-xl p-1.5 border border-gray-800">
+            <button
+              onClick={() => setAnnual(false)}
+              className={`px-5 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer ${
+                !annual
+                  ? 'bg-amber-500 text-gray-950'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Monthly
+            </button>
+            <button
+              onClick={() => setAnnual(true)}
+              className={`px-5 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 cursor-pointer ${
+                annual
+                  ? 'bg-amber-500 text-gray-950'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Annual
+              <span className="bg-green-500/20 text-green-400 text-xs px-2 py-0.5 rounded-full">
+                Save 20%
+              </span>
+            </button>
+          </div>
+        </div>
 
         {/* Pricing Cards */}
-        <section className="max-w-6xl mx-auto px-6 pb-20">
+        <div className="max-w-6xl mx-auto px-6 pb-24">
           <div className="grid md:grid-cols-3 gap-6">
-            <PricingCard
-              name="Starter"
-              monthlyPrice={PRICES.starter.monthly}
-              yearlyPrice={PRICES.starter.yearly}
-              annual={annual}
-              description="Essential online presence for owner-operators"
-              features={['Professional carrier website', 'FMCSA data auto-populated', 'Broker packet PDF', 'Public carrier profile', 'Mobile-responsive design', 'SSL certificate']}
-              priceId={annual ? PRICE_IDS.starter.yearly : PRICE_IDS.starter.monthly}
-              isLoggedIn={!!user}
-            />
-            <PricingCard
-              name="Professional"
-              monthlyPrice={PRICES.professional.monthly}
-              yearlyPrice={PRICES.professional.yearly}
-              annual={annual}
-              description="Full customization for growing carriers"
-              features={['Everything in Starter, plus:', 'Custom company description', 'Logo upload & branding', 'Service lane customization', 'Request a Quote form', 'Document uploads', 'FMCSA data auto-refresh']}
-              priceId={annual ? PRICE_IDS.professional.yearly : PRICE_IDS.professional.monthly}
-              isLoggedIn={!!user}
-              popular
-            />
-            <PricingCard
-              name="Fleet"
-              monthlyPrice={PRICES.fleet.monthly}
-              yearlyPrice={PRICES.fleet.yearly}
-              annual={annual}
-              description="Enterprise features for established fleets"
-              features={['Everything in Professional, plus:', 'Custom domain', 'Multiple user accounts', 'Priority support', 'Analytics dashboard', 'API access', 'White-label branding']}
-              priceId={annual ? PRICE_IDS.fleet.yearly : PRICE_IDS.fleet.monthly}
-              isLoggedIn={!!user}
-            />
-          </div>
-        </section>
-
-        {/* Feature Comparison Table */}
-        <section className="border-t border-gray-800/50">
-          <div className="max-w-6xl mx-auto px-6 py-20">
-            <h2 className="text-3xl font-bold text-center mb-12">Feature Comparison</h2>
-
-            {/* Desktop Table */}
-            <div className="hidden md:block">
-              <div className="bg-gray-900/50 border border-gray-800 rounded-2xl overflow-hidden">
-                {/* Header */}
-                <div className="grid grid-cols-4 gap-4 px-6 py-4 bg-gray-900 border-b border-gray-800">
-                  <div className="text-sm font-medium text-gray-400">Feature</div>
-                  <div className="text-sm font-medium text-center">Starter</div>
-                  <div className="text-sm font-medium text-center text-orange-500">Professional</div>
-                  <div className="text-sm font-medium text-center">Fleet</div>
-                </div>
-                {/* Rows */}
-                {features.map((feature, i) => (
-                  <div
-                    key={feature.text}
-                    className={`grid grid-cols-4 gap-4 px-6 py-3 ${i !== features.length - 1 ? 'border-b border-gray-800/50' : ''}`}
-                  >
-                    <div className="text-sm text-gray-300">{feature.text}</div>
-                    <FeatureCheck included={feature.starter} />
-                    <FeatureCheck included={feature.professional} />
-                    <FeatureCheck included={feature.fleet} />
-                  </div>
-                ))}
-                {/* Pricing Row */}
-                <div className="grid grid-cols-4 gap-4 px-6 py-4 bg-gray-900 border-t border-gray-800">
-                  <div className="text-sm font-medium text-gray-400">Monthly Price</div>
-                  <div className="text-center font-bold">${PRICES.starter.monthly}</div>
-                  <div className="text-center font-bold text-orange-500">${PRICES.professional.monthly}</div>
-                  <div className="text-center font-bold">${PRICES.fleet.monthly}</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Mobile: just show CTA */}
-            <div className="md:hidden text-center">
-              <p className="text-gray-400 mb-6">View feature comparison on a wider screen, or choose a plan to get started.</p>
-              <Link
-                to="/signup"
-                className="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold px-8 py-3.5 rounded-xl transition-all"
+            {PLANS.map((plan) => (
+              <div
+                key={plan.id}
+                className={`relative rounded-2xl p-8 border transition-all ${
+                  plan.highlight
+                    ? 'border-amber-500/50 bg-gradient-to-b from-amber-500/10 to-gray-900'
+                    : 'border-gray-800 bg-gray-900 hover:border-gray-700'
+                }`}
               >
-                Get Started
-              </Link>
-            </div>
-          </div>
-        </section>
+                {plan.badge && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                    <span className="bg-amber-500 text-gray-950 text-xs font-bold px-4 py-1 rounded-full tracking-wider">
+                      {plan.badge}
+                    </span>
+                  </div>
+                )}
 
-        {/* FAQ */}
-        <section className="border-t border-gray-800/50">
-          <div className="max-w-3xl mx-auto px-6 py-20">
-            <h2 className="text-3xl font-bold text-center mb-12">Frequently Asked Questions</h2>
-            <div className="space-y-6">
-              <FaqItem
-                question="Can I try it before paying?"
-                answer="Yes! All plans include a 14-day free trial. Enter your MC number, create your account, and choose a plan — your card won't be charged until the trial ends."
-              />
-              <FaqItem
-                question="Can I upgrade or downgrade anytime?"
-                answer="Absolutely. You can change your plan at any time from the billing portal. Upgrades take effect immediately, and downgrades apply at the next billing cycle."
-              />
-              <FaqItem
-                question="How often is the FMCSA data updated?"
-                answer="Professional and Fleet plans include automatic FMCSA data refresh. Starter plans can manually trigger a refresh from the dashboard."
-              />
-              <FaqItem
-                question="Do I need technical skills?"
-                answer="Not at all. Just enter your MC number and we handle everything — website, broker packet, and carrier profile are all generated automatically."
-              />
-              <FaqItem
-                question="Can I cancel anytime?"
-                answer="Yes, there are no long-term contracts. Cancel anytime from your billing portal and your subscription will end at the close of the current billing period."
-              />
-            </div>
+                <div className="mb-6">
+                  <h3 className="text-lg font-bold tracking-wide text-gray-300 uppercase mb-1">
+                    {plan.name}
+                  </h3>
+                  <div className="flex items-baseline gap-1 mb-2">
+                    <span className="text-4xl font-black">
+                      ${annual ? getPrice(plan.price).toLocaleString() : plan.price}
+                    </span>
+                    <span className="text-gray-500 text-sm">
+                      /{annual ? 'yr' : 'mo'}
+                    </span>
+                  </div>
+                  <p className="text-gray-500 text-sm">{plan.description}</p>
+                </div>
+
+                <button
+                  onClick={() => handleCheckout(plan)}
+                  disabled={loading === plan.id}
+                  className={`w-full py-3 rounded-xl font-bold text-sm tracking-wide transition-all mb-8 cursor-pointer ${
+                    plan.highlight
+                      ? 'bg-amber-500 text-gray-950 hover:bg-amber-400 active:scale-95'
+                      : 'border border-gray-700 text-white hover:border-gray-500 hover:bg-gray-800 active:scale-95'
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                >
+                  {loading === plan.id ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      Processing...
+                    </span>
+                  ) : (
+                    plan.cta
+                  )}
+                </button>
+
+                <ul className="space-y-3">
+                  {plan.features.map((feature) => (
+                    <li key={feature} className="flex items-start gap-3 text-sm">
+                      <svg
+                        className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M5 13l4 4L19 7"
+                        />
+                      </svg>
+                      <span className="text-gray-400">{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
           </div>
-        </section>
+
+          {/* Trust bar */}
+          <div className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-6">
+            {[
+              { label: 'FMCSA Verified', icon: 'shield' },
+              { label: '14-Day Free Trial', icon: 'clock' },
+              { label: 'Cancel Anytime', icon: 'check' },
+              { label: 'SSL Included', icon: 'lock' },
+            ].map((item) => (
+              <div
+                key={item.label}
+                className="flex items-center gap-3 bg-gray-900 border border-gray-800 rounded-xl px-4 py-3"
+              >
+                <TrustIcon type={item.icon} />
+                <span className="text-sm text-gray-400 font-medium">{item.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
       </main>
 
       <Footer />
@@ -224,140 +266,36 @@ function Pricing() {
   )
 }
 
-function PricingCard({
-  name,
-  monthlyPrice,
-  yearlyPrice,
-  annual,
-  description,
-  features,
-  priceId,
-  isLoggedIn,
-  popular = false,
-}: {
-  name: string
-  monthlyPrice: number
-  yearlyPrice: number
-  annual: boolean
-  description: string
-  features: string[]
-  priceId: string
-  isLoggedIn: boolean
-  popular?: boolean
-}) {
-  const { startCheckout } = useSubscription()
-  const [checkoutLoading, setCheckoutLoading] = useState(false)
-  const [error, setError] = useState('')
-
-  const displayPrice = annual ? Math.round(yearlyPrice / 12) : monthlyPrice
-
-  const handleClick = async () => {
-    if (!isLoggedIn || !priceId) return
-
-    setCheckoutLoading(true)
-    setError('')
-    try {
-      await startCheckout(priceId)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to start checkout.')
-      setCheckoutLoading(false)
-    }
+function TrustIcon({ type }: { type: string }) {
+  const cls = "w-5 h-5 text-amber-400"
+  switch (type) {
+    case 'shield':
+      return (
+        <svg className={cls} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+        </svg>
+      )
+    case 'clock':
+      return (
+        <svg className={cls} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      )
+    case 'check':
+      return (
+        <svg className={cls} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+        </svg>
+      )
+    case 'lock':
+      return (
+        <svg className={cls} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+        </svg>
+      )
+    default:
+      return null
   }
-
-  return (
-    <div
-      className={`relative bg-gray-900/50 border rounded-2xl p-8 flex flex-col ${
-        popular ? 'border-orange-500 shadow-lg shadow-orange-500/10' : 'border-gray-800'
-      }`}
-    >
-      {popular && (
-        <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-          <span className="bg-orange-500 text-white text-xs font-semibold px-4 py-1 rounded-full">
-            Most Popular
-          </span>
-        </div>
-      )}
-      <div className="mb-6">
-        <h3 className="text-xl font-bold mb-1">{name}</h3>
-        <p className="text-sm text-gray-400">{description}</p>
-      </div>
-      <div className="mb-6">
-        <span className="text-5xl font-bold">${displayPrice}</span>
-        <span className="text-gray-400 ml-1">/mo</span>
-        {annual && (
-          <p className="text-xs text-emerald-400 mt-1">
-            ${yearlyPrice}/year — save ${monthlyPrice * 12 - yearlyPrice}
-          </p>
-        )}
-      </div>
-      <ul className="space-y-3 mb-8 flex-1">
-        {features.map((feature) => (
-          <li key={feature} className="flex items-start gap-2.5">
-            {feature.includes('Everything in') ? (
-              <Shield className="w-4 h-4 text-orange-500 mt-0.5 flex-shrink-0" />
-            ) : (
-              <Check className="w-4 h-4 text-orange-500 mt-0.5 flex-shrink-0" />
-            )}
-            <span className={`text-sm ${feature.includes('Everything in') ? 'text-orange-400 font-medium' : 'text-gray-300'}`}>
-              {feature}
-            </span>
-          </li>
-        ))}
-      </ul>
-
-      {error && <p className="text-red-400 text-xs mb-3">{error}</p>}
-
-      {isLoggedIn && priceId ? (
-        <button
-          onClick={handleClick}
-          disabled={checkoutLoading}
-          className={`w-full flex items-center justify-center gap-2 font-semibold py-3.5 rounded-xl transition-all cursor-pointer ${
-            popular
-              ? 'bg-orange-500 hover:bg-orange-600 text-white'
-              : 'bg-gray-800 hover:bg-gray-700 text-white border border-gray-700'
-          }`}
-        >
-          {checkoutLoading ? (
-            <Loader2 className="w-5 h-5 animate-spin" />
-          ) : (
-            'Start Free Trial'
-          )}
-        </button>
-      ) : (
-        <Link
-          to="/signup"
-          className={`w-full flex items-center justify-center gap-2 font-semibold py-3.5 rounded-xl transition-all ${
-            popular
-              ? 'bg-orange-500 hover:bg-orange-600 text-white'
-              : 'bg-gray-800 hover:bg-gray-700 text-white border border-gray-700'
-          }`}
-        >
-          Get Started
-        </Link>
-      )}
-    </div>
-  )
-}
-
-function FeatureCheck({ included }: { included: boolean }) {
-  return (
-    <div className="flex justify-center">
-      {included ? (
-        <Check className="w-5 h-5 text-orange-500" />
-      ) : (
-        <X className="w-5 h-5 text-gray-700" />
-      )}
-    </div>
-  )
-}
-
-function FaqItem({ question, answer }: { question: string; answer: string }) {
-  return (
-    <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-6">
-      <h3 className="font-semibold mb-2">{question}</h3>
-      <p className="text-sm text-gray-400 leading-relaxed">{answer}</p>
-    </div>
-  )
 }
 
 export default Pricing
