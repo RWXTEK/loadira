@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import BillingCard from '../components/BillingCard'
 import { useAuth } from '../hooks/useAuth'
 import { buildCarrierDisplay, getSafetyRatingColor, formatCurrency } from '../lib/mockFmcsa'
 
@@ -160,6 +161,11 @@ function Dashboard() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Billing */}
+        <div className="mb-8">
+          <BillingCard />
         </div>
 
         {/* Quick Actions */}

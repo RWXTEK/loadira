@@ -1,7 +1,10 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Check, X, Zap, Shield } from 'lucide-react'
+import { Check, X, Zap, Shield, Loader2 } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import { useAuth } from '../hooks/useAuth'
+import { useSubscription } from '../hooks/useSubscription'
 
 interface PlanFeature {
   text: string
@@ -31,7 +34,31 @@ const features: PlanFeature[] = [
   { text: 'White-label branding', starter: false, professional: false, fleet: true },
 ]
 
+const PRICE_IDS = {
+  starter: {
+    monthly: import.meta.env.VITE_STRIPE_PRICE_STARTER || '',
+    yearly: import.meta.env.VITE_STRIPE_PRICE_STARTER_ANNUAL || '',
+  },
+  professional: {
+    monthly: import.meta.env.VITE_STRIPE_PRICE_PROFESSIONAL || '',
+    yearly: import.meta.env.VITE_STRIPE_PRICE_PROFESSIONAL_ANNUAL || '',
+  },
+  fleet: {
+    monthly: import.meta.env.VITE_STRIPE_PRICE_FLEET || '',
+    yearly: import.meta.env.VITE_STRIPE_PRICE_FLEET_ANNUAL || '',
+  },
+}
+
+const PRICES = {
+  starter: { monthly: 49, yearly: 470 },
+  professional: { monthly: 99, yearly: 950 },
+  fleet: { monthly: 199, yearly: 1990 },
+}
+
 function Pricing() {
+  const [annual, setAnnual] = useState(false)
+  const { user } = useAuth()
+
   return (
     <div className="min-h-screen bg-gray-950 text-white flex flex-col">
       <Navbar />
@@ -43,14 +70,35 @@ function Pricing() {
           <div className="relative max-w-4xl mx-auto px-6 pt-20 pb-16 text-center">
             <div className="inline-flex items-center gap-2 bg-orange-500/10 border border-orange-500/20 rounded-full px-4 py-1.5 mb-6">
               <Zap className="w-4 h-4 text-orange-500" />
-              <span className="text-sm text-orange-400 font-medium">Simple, transparent pricing</span>
+              <span className="text-sm text-orange-400 font-medium">14-day free trial on all plans</span>
             </div>
             <h1 className="text-4xl md:text-5xl font-bold mb-4">
               Plans that scale with your <span className="text-orange-500">fleet</span>
             </h1>
-            <p className="text-xl text-gray-400 max-w-2xl mx-auto">
-              Start free. Upgrade when you need more. No hidden fees, cancel anytime.
+            <p className="text-xl text-gray-400 max-w-2xl mx-auto mb-8">
+              Start with a free trial. Upgrade when you need more. No hidden fees, cancel anytime.
             </p>
+
+            {/* Billing Toggle */}
+            <div className="inline-flex items-center gap-3 bg-gray-900 border border-gray-800 rounded-full p-1">
+              <button
+                onClick={() => setAnnual(false)}
+                className={`text-sm font-medium px-5 py-2 rounded-full transition-all cursor-pointer ${
+                  !annual ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                Monthly
+              </button>
+              <button
+                onClick={() => setAnnual(true)}
+                className={`text-sm font-medium px-5 py-2 rounded-full transition-all cursor-pointer ${
+                  annual ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                Annual
+                <span className="ml-1.5 text-[11px] text-emerald-400 font-semibold">Save 20%</span>
+              </button>
+            </div>
           </div>
         </section>
 
@@ -59,28 +107,34 @@ function Pricing() {
           <div className="grid md:grid-cols-3 gap-6">
             <PricingCard
               name="Starter"
-              price="15"
+              monthlyPrice={PRICES.starter.monthly}
+              yearlyPrice={PRICES.starter.yearly}
+              annual={annual}
               description="Essential online presence for owner-operators"
               features={['Professional carrier website', 'FMCSA data auto-populated', 'Broker packet PDF', 'Public carrier profile', 'Mobile-responsive design', 'SSL certificate']}
-              cta="Get Started"
-              ctaLink="/signup"
+              priceId={annual ? PRICE_IDS.starter.yearly : PRICE_IDS.starter.monthly}
+              isLoggedIn={!!user}
             />
             <PricingCard
               name="Professional"
-              price="20"
+              monthlyPrice={PRICES.professional.monthly}
+              yearlyPrice={PRICES.professional.yearly}
+              annual={annual}
               description="Full customization for growing carriers"
               features={['Everything in Starter, plus:', 'Custom company description', 'Logo upload & branding', 'Service lane customization', 'Request a Quote form', 'Document uploads', 'FMCSA data auto-refresh']}
-              cta="Get Started"
-              ctaLink="/signup"
+              priceId={annual ? PRICE_IDS.professional.yearly : PRICE_IDS.professional.monthly}
+              isLoggedIn={!!user}
               popular
             />
             <PricingCard
               name="Fleet"
-              price="35"
+              monthlyPrice={PRICES.fleet.monthly}
+              yearlyPrice={PRICES.fleet.yearly}
+              annual={annual}
               description="Enterprise features for established fleets"
               features={['Everything in Professional, plus:', 'Custom domain', 'Multiple user accounts', 'Priority support', 'Analytics dashboard', 'API access', 'White-label branding']}
-              cta="Get Started"
-              ctaLink="/signup"
+              priceId={annual ? PRICE_IDS.fleet.yearly : PRICE_IDS.fleet.monthly}
+              isLoggedIn={!!user}
             />
           </div>
         </section>
@@ -115,9 +169,9 @@ function Pricing() {
                 {/* Pricing Row */}
                 <div className="grid grid-cols-4 gap-4 px-6 py-4 bg-gray-900 border-t border-gray-800">
                   <div className="text-sm font-medium text-gray-400">Monthly Price</div>
-                  <div className="text-center font-bold">$15</div>
-                  <div className="text-center font-bold text-orange-500">$20</div>
-                  <div className="text-center font-bold">$35</div>
+                  <div className="text-center font-bold">${PRICES.starter.monthly}</div>
+                  <div className="text-center font-bold text-orange-500">${PRICES.professional.monthly}</div>
+                  <div className="text-center font-bold">${PRICES.fleet.monthly}</div>
                 </div>
               </div>
             </div>
@@ -142,11 +196,11 @@ function Pricing() {
             <div className="space-y-6">
               <FaqItem
                 question="Can I try it before paying?"
-                answer="Yes! Enter your MC number and we'll generate a preview of your site for free. You only pay when you're ready to publish."
+                answer="Yes! All plans include a 14-day free trial. Enter your MC number, create your account, and choose a plan — your card won't be charged until the trial ends."
               />
               <FaqItem
                 question="Can I upgrade or downgrade anytime?"
-                answer="Absolutely. You can change your plan at any time. Upgrades take effect immediately, and downgrades apply at the next billing cycle."
+                answer="Absolutely. You can change your plan at any time from the billing portal. Upgrades take effect immediately, and downgrades apply at the next billing cycle."
               />
               <FaqItem
                 question="How often is the FMCSA data updated?"
@@ -158,7 +212,7 @@ function Pricing() {
               />
               <FaqItem
                 question="Can I cancel anytime?"
-                answer="Yes, there are no long-term contracts. Cancel anytime from your dashboard and your subscription will end at the close of the current billing period."
+                answer="Yes, there are no long-term contracts. Cancel anytime from your billing portal and your subscription will end at the close of the current billing period."
               />
             </div>
           </div>
@@ -172,21 +226,44 @@ function Pricing() {
 
 function PricingCard({
   name,
-  price,
+  monthlyPrice,
+  yearlyPrice,
+  annual,
   description,
   features,
-  cta,
-  ctaLink,
+  priceId,
+  isLoggedIn,
   popular = false,
 }: {
   name: string
-  price: string
+  monthlyPrice: number
+  yearlyPrice: number
+  annual: boolean
   description: string
   features: string[]
-  cta: string
-  ctaLink: string
+  priceId: string
+  isLoggedIn: boolean
   popular?: boolean
 }) {
+  const { startCheckout } = useSubscription()
+  const [checkoutLoading, setCheckoutLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const displayPrice = annual ? Math.round(yearlyPrice / 12) : monthlyPrice
+
+  const handleClick = async () => {
+    if (!isLoggedIn || !priceId) return
+
+    setCheckoutLoading(true)
+    setError('')
+    try {
+      await startCheckout(priceId)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to start checkout.')
+      setCheckoutLoading(false)
+    }
+  }
+
   return (
     <div
       className={`relative bg-gray-900/50 border rounded-2xl p-8 flex flex-col ${
@@ -205,8 +282,13 @@ function PricingCard({
         <p className="text-sm text-gray-400">{description}</p>
       </div>
       <div className="mb-6">
-        <span className="text-5xl font-bold">${price}</span>
+        <span className="text-5xl font-bold">${displayPrice}</span>
         <span className="text-gray-400 ml-1">/mo</span>
+        {annual && (
+          <p className="text-xs text-emerald-400 mt-1">
+            ${yearlyPrice}/year — save ${monthlyPrice * 12 - yearlyPrice}
+          </p>
+        )}
       </div>
       <ul className="space-y-3 mb-8 flex-1">
         {features.map((feature) => (
@@ -222,16 +304,37 @@ function PricingCard({
           </li>
         ))}
       </ul>
-      <Link
-        to={ctaLink}
-        className={`w-full flex items-center justify-center gap-2 font-semibold py-3.5 rounded-xl transition-all ${
-          popular
-            ? 'bg-orange-500 hover:bg-orange-600 text-white'
-            : 'bg-gray-800 hover:bg-gray-700 text-white border border-gray-700'
-        }`}
-      >
-        {cta}
-      </Link>
+
+      {error && <p className="text-red-400 text-xs mb-3">{error}</p>}
+
+      {isLoggedIn && priceId ? (
+        <button
+          onClick={handleClick}
+          disabled={checkoutLoading}
+          className={`w-full flex items-center justify-center gap-2 font-semibold py-3.5 rounded-xl transition-all cursor-pointer ${
+            popular
+              ? 'bg-orange-500 hover:bg-orange-600 text-white'
+              : 'bg-gray-800 hover:bg-gray-700 text-white border border-gray-700'
+          }`}
+        >
+          {checkoutLoading ? (
+            <Loader2 className="w-5 h-5 animate-spin" />
+          ) : (
+            'Start Free Trial'
+          )}
+        </button>
+      ) : (
+        <Link
+          to="/signup"
+          className={`w-full flex items-center justify-center gap-2 font-semibold py-3.5 rounded-xl transition-all ${
+            popular
+              ? 'bg-orange-500 hover:bg-orange-600 text-white'
+              : 'bg-gray-800 hover:bg-gray-700 text-white border border-gray-700'
+          }`}
+        >
+          Get Started
+        </Link>
+      )}
     </div>
   )
 }
