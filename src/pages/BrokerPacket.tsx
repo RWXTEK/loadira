@@ -11,6 +11,7 @@ import {
   CheckCircle,
   Package,
   Globe,
+  Loader2,
 } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
@@ -18,8 +19,16 @@ import { useAuth } from '../hooks/useAuth'
 import { buildCarrierDisplay, formatCurrency } from '../lib/mockFmcsa'
 
 function BrokerPacket() {
-  const { carrier: carrierRow } = useAuth()
+  const { carrier: carrierRow, loading } = useAuth()
   const carrier = buildCarrierDisplay(carrierRow)
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gray-950 text-white flex flex-col">

@@ -19,10 +19,15 @@ import { supabase } from '../lib/supabase'
 import { sanitizeText, sanitizeHexColor, sanitizeForDb } from '../lib/sanitize'
 
 function Settings() {
-  const { carrier, refreshCarrier } = useAuth()
+  const { carrier, refreshCarrier, loading } = useAuth()
 
-  const [heroText, setHeroText] = useState(carrier?.company_description || '')
-  const [primaryColor, setPrimaryColor] = useState(carrier?.brand_color || '#f97316')
+  const fmcsaRaw = (carrier?.fmcsa_raw && typeof carrier.fmcsa_raw === 'object' ? carrier.fmcsa_raw : {}) as Record<string, unknown>
+  const [heroText, setHeroText] = useState(
+    carrier?.company_description || (typeof fmcsaRaw.companyDescription === 'string' ? fmcsaRaw.companyDescription : '') || ''
+  )
+  const [primaryColor, setPrimaryColor] = useState(
+    carrier?.brand_color || (typeof fmcsaRaw.brandColor === 'string' ? fmcsaRaw.brandColor : '') || '#f97316'
+  )
   const [logoUrl] = useState(carrier?.logo_url || '')
   const [isSaving, setIsSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -74,6 +79,14 @@ function Settings() {
 
   const removeDocument = (index: number) => {
     setDocuments(documents.filter((_, i) => i !== index))
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
+      </div>
+    )
   }
 
   return (

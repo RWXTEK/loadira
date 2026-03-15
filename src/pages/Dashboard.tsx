@@ -14,6 +14,7 @@ import {
   TrendingUp,
   Clock,
   Eye,
+  Loader2,
 } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
@@ -21,7 +22,7 @@ import { useAuth } from '../hooks/useAuth'
 import { buildCarrierDisplay, getSafetyRatingColor, formatCurrency } from '../lib/mockFmcsa'
 
 function Dashboard() {
-  const { carrier: carrierRow } = useAuth()
+  const { carrier: carrierRow, loading } = useAuth()
 
   const carrier = buildCarrierDisplay(carrierRow)
 
@@ -29,9 +30,17 @@ function Dashboard() {
 
   const safetyScore = Math.round(
     100 -
-      (carrier.inspections.vehicleOosRate + carrier.inspections.driverOosRate) / 2 -
-      carrier.crashes.total * 2
+      ((carrier.inspections?.vehicleOosRate ?? 0) + (carrier.inspections?.driverOosRate ?? 0)) / 2 -
+      (carrier.crashes?.total ?? 0) * 2
   )
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gray-950 text-white flex flex-col">
@@ -77,7 +86,7 @@ function Dashboard() {
             icon={<Truck className="w-5 h-5" />}
             label="Power Units"
             value={String(carrier.totalPowerUnits)}
-            subtext={`${carrier.equipment.tractorTrailers} tractors, ${carrier.equipment.straightTrucks} straight`}
+            subtext={`${carrier.equipment?.tractorTrailers ?? 0} tractors, ${carrier.equipment?.straightTrucks ?? 0} straight`}
           />
           <StatCard
             icon={<Users className="w-5 h-5" />}
