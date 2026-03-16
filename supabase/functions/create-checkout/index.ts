@@ -2,15 +2,22 @@ import Stripe from 'https://esm.sh/stripe@14.14.0'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY')!, { apiVersion: '2023-10-16' })
+const ALLOWED_ORIGIN = Deno.env.get('ALLOWED_ORIGIN') || 'https://loadira.com'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+function corsHeaders(origin: string | null) {
+  const allowed = origin === ALLOWED_ORIGIN || origin?.startsWith('http://localhost')
+  return {
+    'Access-Control-Allow-Origin': allowed ? origin! : ALLOWED_ORIGIN,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  }
 }
 
 Deno.serve(async (req) => {
+  const origin = req.headers.get('origin')
+  const headers = corsHeaders(origin)
+
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response('ok', { headers })
   }
 
   try {
@@ -23,29 +30,31 @@ Deno.serve(async (req) => {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 401, headers: { ...headers, 'Content-Type': 'application/json' },
       })
     }
 
     const { priceId, successUrl, cancelUrl } = await req.json()
 
-    if (!priceId) {
-      return new Response(JSON.stringify({ error: 'Price ID required' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    if (!priceId || typeof priceId !== 'string' || !priceId.startsWith('price_')) {
+      return new Response(JSON.stringify({ error: 'Invalid price ID' }), {
+        status: 400, headers: { ...headers, 'Content-Type': 'application/json' },
       })
     }
 
-    // Get or create carrier row
-    const { data: carrier } = await createClient(
+    const adminClient = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    ).from('carriers').select('id, stripe_customer_id').eq('user_id', user.id).single()
+    )
+
+    const { data: carrier } = await adminClient
+      .from('carriers')
+      .select('id, stripe_customer_id')
+      .eq('user_id', user.id)
+      .single()
 
     let customerId = carrier?.stripe_customer_id
 
-    // Create Stripe customer if needed
     if (!customerId) {
       const customer = await stripe.customers.create({
         email: user.email,
@@ -53,16 +62,16 @@ Deno.serve(async (req) => {
       })
       customerId = customer.id
 
-      // Save customer ID to carrier
       if (carrier?.id) {
-        await createClient(
-          Deno.env.get('SUPABASE_URL')!,
-          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-        ).from('carriers').update({ stripe_customer_id: customerId }).eq('id', carrier.id)
+        await adminClient.from('carriers').update({ stripe_customer_id: customerId }).eq('id', carrier.id)
       }
     }
 
-    // Create checkout session with 14-day trial
+    // Validate redirect URLs — must be same origin
+    const validOrigin = ALLOWED_ORIGIN
+    const safeSuccessUrl = successUrl?.startsWith(validOrigin) ? successUrl : `${validOrigin}/dashboard?checkout=success`
+    const safeCancelUrl = cancelUrl?.startsWith(validOrigin) ? cancelUrl : `${validOrigin}/pricing`
+
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: 'subscription',
@@ -72,18 +81,26 @@ Deno.serve(async (req) => {
         trial_period_days: 14,
         metadata: { supabase_user_id: user.id, carrier_id: carrier?.id || '' },
       },
-      success_url: successUrl || `${req.headers.get('origin')}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: cancelUrl || `${req.headers.get('origin')}/pricing`,
+      success_url: safeSuccessUrl,
+      cancel_url: safeCancelUrl,
       metadata: { supabase_user_id: user.id, carrier_id: carrier?.id || '' },
     })
 
+    // Audit log
+    await adminClient.from('audit_log').insert({
+      user_id: user.id,
+      carrier_id: carrier?.id,
+      action: 'checkout.started',
+      table_name: 'subscriptions',
+      new_values: { price_id: priceId, session_id: session.id },
+    }).then(() => {})
+
     return new Response(JSON.stringify({ url: session.url, sessionId: session.id }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...headers, 'Content-Type': 'application/json' },
     })
-  } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  } catch {
+    return new Response(JSON.stringify({ error: 'Failed to create checkout session' }), {
+      status: 500, headers: { ...headers, 'Content-Type': 'application/json' },
     })
   }
 })

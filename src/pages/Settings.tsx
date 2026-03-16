@@ -24,6 +24,26 @@ import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
 import { sanitizeText, sanitizeHexColor, sanitizeForDb } from '../lib/sanitize'
 
+// Validate file magic bytes to prevent spoofed MIME types
+async function validateFileMagic(file: File, allowedTypes: string[]): Promise<boolean> {
+  const buffer = await file.slice(0, 8).arrayBuffer()
+  const bytes = new Uint8Array(buffer)
+
+  const signatures: Record<string, number[]> = {
+    png: [0x89, 0x50, 0x4E, 0x47],       // .PNG
+    jpg: [0xFF, 0xD8, 0xFF],              // JFIF/EXIF
+    webp: [0x52, 0x49, 0x46, 0x46],       // RIFF (WebP container)
+    pdf: [0x25, 0x50, 0x44, 0x46],        // %PDF
+  }
+
+  for (const type of allowedTypes) {
+    const sig = signatures[type]
+    if (!sig) continue
+    if (sig.every((b, i) => bytes[i] === b)) return true
+  }
+  return false
+}
+
 interface DocRow {
   id: string
   name: string
@@ -170,15 +190,22 @@ function Settings() {
       setUploadError('Logo must be under 2MB.')
       return
     }
-    if (!['image/png', 'image/jpeg', 'image/svg+xml', 'image/webp'].includes(file.type)) {
-      setUploadError('Logo must be PNG, JPG, SVG, or WebP.')
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+      setUploadError('Logo must be PNG, JPG, or WebP.')
+      return
+    }
+
+    // Validate file magic bytes
+    const magicValid = await validateFileMagic(file, ['png', 'jpg', 'webp'])
+    if (!magicValid) {
+      setUploadError('File content does not match its type. Please upload a valid image.')
       return
     }
 
     setUploadingLogo(true)
     setUploadError('')
 
-    const ext = file.name.split('.').pop()
+    const ext = file.name.split('.').pop()?.toLowerCase().replace(/[^a-z]/g, '') || 'png'
     const path = `${carrier.user_id}/logo.${ext}`
 
     const { error: uploadErr } = await supabase.storage
@@ -186,7 +213,7 @@ function Settings() {
       .upload(path, file, { upsert: true })
 
     if (uploadErr) {
-      setUploadError(uploadErr.message)
+      setUploadError('Failed to upload logo. Please try again.')
       setUploadingLogo(false)
       return
     }
@@ -204,6 +231,21 @@ function Settings() {
   const handleDocUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || !carrier) return
+
+    // Validate extension
+    const docExt = file.name.split('.').pop()?.toLowerCase()
+    if (!docExt || !['pdf', 'png', 'jpg', 'jpeg'].includes(docExt)) {
+      setUploadError('Document must be PDF, PNG, or JPG.')
+      return
+    }
+
+    // Validate magic bytes
+    const magicTypes = docExt === 'pdf' ? ['pdf'] : docExt === 'png' ? ['png'] : ['jpg']
+    const docMagicValid = await validateFileMagic(file, magicTypes)
+    if (!docMagicValid) {
+      setUploadError('File content does not match its extension. Please upload a valid file.')
+      return
+    }
 
     if (file.size > 10 * 1024 * 1024) {
       setUploadError('Document must be under 10MB.')
@@ -332,7 +374,7 @@ function Settings() {
                 )}
               </div>
               <div>
-                <input ref={logoInputRef} type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" onChange={handleLogoUpload} className="hidden" />
+                <input ref={logoInputRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={handleLogoUpload} className="hidden" />
                 <button
                   onClick={() => logoInputRef.current?.click()}
                   disabled={uploadingLogo}

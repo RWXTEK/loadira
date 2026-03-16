@@ -129,7 +129,8 @@ function Signup() {
         })
 
       if (carrierError) {
-        setSignupError(carrierError.message)
+        console.error('Carrier insert error:', carrierError.message)
+        setSignupError('Failed to create your carrier profile. Please try again or contact support.')
         setIsSubmitting(false)
         return
       }

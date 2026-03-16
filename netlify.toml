@@ -3,6 +3,9 @@
   publish = "dist"
   functions = "netlify/functions"
 
+[build.environment]
+  # FMCSA_API_KEY must be set in Netlify Dashboard → Site settings → Environment variables
+
 # Security headers
 [[headers]]
   for = "/*"
@@ -12,8 +15,22 @@
     X-XSS-Protection = "1; mode=block"
     Referrer-Policy = "strict-origin-when-cross-origin"
     Permissions-Policy = "camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
 
-# SPA redirect — must come after headers
+# Force HTTPS
+[[redirects]]
+  from = "http://loadira.com/*"
+  to = "https://loadira.com/:splat"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "http://www.loadira.com/*"
+  to = "https://loadira.com/:splat"
+  status = 301
+  force = true
+
+# SPA redirect — must come last
 [[redirects]]
   from = "/*"
   to = "/index.html"
