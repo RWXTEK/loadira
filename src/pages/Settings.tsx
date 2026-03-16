@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   Save,
   Upload,
@@ -11,6 +11,12 @@ import {
   Trash2,
   Plus,
   X,
+  Phone,
+  Mail,
+  Truck,
+  ShieldCheck,
+  AlertTriangle,
+  Home,
 } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
@@ -18,52 +24,238 @@ import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
 import { sanitizeText, sanitizeHexColor, sanitizeForDb } from '../lib/sanitize'
 
+interface DocRow {
+  id: string
+  name: string
+  type: string
+  file_url: string
+  created_at: string
+}
+
 function Settings() {
   const { carrier, refreshCarrier, loading } = useAuth()
+  const logoInputRef = useRef<HTMLInputElement>(null)
+  const docInputRef = useRef<HTMLInputElement>(null)
 
   const fmcsaRaw = (carrier?.fmcsa_raw && typeof carrier.fmcsa_raw === 'object' ? carrier.fmcsa_raw : {}) as Record<string, unknown>
-  const [heroText, setHeroText] = useState(
-    carrier?.company_description || (typeof fmcsaRaw.companyDescription === 'string' ? fmcsaRaw.companyDescription : '') || ''
-  )
-  const [primaryColor, setPrimaryColor] = useState(
-    carrier?.brand_color || (typeof fmcsaRaw.brandColor === 'string' ? fmcsaRaw.brandColor : '') || '#f97316'
-  )
-  const [logoUrl] = useState(carrier?.logo_url || '')
-  const [isSaving, setIsSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
+  const rawAddr = (fmcsaRaw.physicalAddress && typeof fmcsaRaw.physicalAddress === 'object' ? fmcsaRaw.physicalAddress : {}) as Record<string, string>
+  const rawIns = (fmcsaRaw.insuranceData && typeof fmcsaRaw.insuranceData === 'object' ? fmcsaRaw.insuranceData : {}) as Record<string, unknown>
+  const eq = (carrier?.equipment && typeof carrier.equipment === 'object' ? carrier.equipment : {}) as Record<string, number>
 
-  const [documents, setDocuments] = useState<{ name: string; type: string; date: string }[]>([
-    { name: 'W9-Form.pdf', type: 'W-9 Form', date: '2024-12-01' },
-    { name: 'COI-2025.pdf', type: 'Certificate of Insurance', date: '2025-01-15' },
-    { name: 'CarrierAgreement.pdf', type: 'Carrier Agreement', date: '2025-02-10' },
-  ])
+  // Company info
+  const [heroText, setHeroText] = useState(carrier?.company_description || (typeof fmcsaRaw.companyDescription === 'string' ? fmcsaRaw.companyDescription : '') || '')
+  const [primaryColor, setPrimaryColor] = useState(carrier?.brand_color || (typeof fmcsaRaw.brandColor === 'string' ? fmcsaRaw.brandColor : '') || '#f97316')
+  const [logoUrl, setLogoUrl] = useState(carrier?.logo_url || '')
+  const [email, setEmail] = useState(carrier?.email || '')
+  const [phone, setPhone] = useState(carrier?.phone || (typeof fmcsaRaw.phone === 'string' ? fmcsaRaw.phone : '') || '')
 
-  // Service lanes stored as hero_text for now (website_settings doesn't have a lanes column)
-  const [serviceLanes, setServiceLanes] = useState<string[]>([])
+  // Address
+  const [addressStreet, setAddressStreet] = useState(carrier?.address_street || rawAddr.street || '')
+  const [addressCity, setAddressCity] = useState(carrier?.address_city || rawAddr.city || '')
+  const [addressState, setAddressState] = useState(carrier?.address_state || rawAddr.state || '')
+  const [addressZip, setAddressZip] = useState(carrier?.address_zip || rawAddr.zip || '')
+  const [mailingStreet, setMailingStreet] = useState(carrier?.mailing_street || '')
+  const [mailingCity, setMailingCity] = useState(carrier?.mailing_city || '')
+  const [mailingState, setMailingState] = useState(carrier?.mailing_state || '')
+  const [mailingZip, setMailingZip] = useState(carrier?.mailing_zip || '')
+
+  // Insurance
+  const [bipdInsurer, setBipdInsurer] = useState(carrier?.bipd_insurer || String(rawIns.bipdInsurer || '') || '')
+  const [bipdPolicyNumber, setBipdPolicyNumber] = useState(carrier?.bipd_policy_number || '')
+  const [cargoInsurer, setCargoInsurer] = useState(carrier?.cargo_insurer || String(rawIns.cargoInsurer || '') || '')
+  const [cargoPolicyNumber, setCargoPolicyNumber] = useState(carrier?.cargo_policy_number || '')
+
+  // Equipment
+  const [straightTrucks, setStraightTrucks] = useState(eq.straightTrucks ?? 0)
+  const [tractorTrailers, setTractorTrailers] = useState(eq.tractorTrailers ?? 0)
+  const [flatbeds, setFlatbeds] = useState(eq.flatbeds ?? 0)
+  const [reefers, setReefers] = useState(eq.reefers ?? 0)
+  const [tankers, setTankers] = useState(eq.tankers ?? 0)
+  const [intermodal, setIntermodal] = useState(eq.intermodal ?? 0)
+
+  // Inspections
+  const [vehicleInspTotal, setVehicleInspTotal] = useState(carrier?.vehicle_inspections_total ?? 0)
+  const [vehicleInspOos, setVehicleInspOos] = useState(carrier?.vehicle_inspections_oos ?? 0)
+  const [driverInspTotal, setDriverInspTotal] = useState(carrier?.driver_inspections_total ?? 0)
+  const [driverInspOos, setDriverInspOos] = useState(carrier?.driver_inspections_oos ?? 0)
+
+  // Crashes
+  const [crashesFatal, setCrashesFatal] = useState(carrier?.crashes_fatal ?? 0)
+  const [crashesInjury, setCrashesInjury] = useState(carrier?.crashes_injury ?? 0)
+  const [crashesTowaway, setCrashesTowaway] = useState(carrier?.crashes_towaway ?? 0)
+
+  // Service lanes
+  const [serviceLanes, setServiceLanes] = useState<string[]>(
+    Array.isArray(carrier?.service_lanes) && carrier.service_lanes.length > 0 ? carrier.service_lanes : []
+  )
   const [newLane, setNewLane] = useState('')
 
+  // Documents from DB
+  const [documents, setDocuments] = useState<DocRow[]>([])
+  const [docsLoading, setDocsLoading] = useState(true)
+
+  // UI state
+  const [isSaving, setIsSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [uploadingDoc, setUploadingDoc] = useState(false)
+  const [uploadError, setUploadError] = useState('')
+
+  // Fetch documents from DB
+  useEffect(() => {
+    if (!carrier?.id) { setDocsLoading(false); return }
+    supabase
+      .from('documents')
+      .select('*')
+      .eq('carrier_id', carrier.id)
+      .order('created_at', { ascending: false })
+      .then(({ data }) => {
+        setDocuments(data || [])
+        setDocsLoading(false)
+      })
+  }, [carrier?.id])
+
   const handleSave = async () => {
+    if (!carrier) return
     setIsSaving(true)
     setSaved(false)
 
-    if (carrier) {
-      const existing = (carrier.fmcsa_raw || {}) as Record<string, unknown>
-      const updateData = sanitizeForDb({
+    const existing = (carrier.fmcsa_raw || {}) as Record<string, unknown>
+    const updatePayload = sanitizeForDb({
+      company_description: sanitizeText(heroText, 1000),
+      brand_color: sanitizeHexColor(primaryColor),
+      email: sanitizeText(email, 200),
+      phone: sanitizeText(phone, 30),
+      address_street: sanitizeText(addressStreet, 200),
+      address_city: sanitizeText(addressCity, 100),
+      address_state: sanitizeText(addressState, 50),
+      address_zip: sanitizeText(addressZip, 20),
+      mailing_street: sanitizeText(mailingStreet, 200),
+      mailing_city: sanitizeText(mailingCity, 100),
+      mailing_state: sanitizeText(mailingState, 50),
+      mailing_zip: sanitizeText(mailingZip, 20),
+      bipd_insurer: sanitizeText(bipdInsurer, 200),
+      bipd_policy_number: sanitizeText(bipdPolicyNumber, 100),
+      cargo_insurer: sanitizeText(cargoInsurer, 200),
+      cargo_policy_number: sanitizeText(cargoPolicyNumber, 100),
+      vehicle_inspections_total: vehicleInspTotal,
+      vehicle_inspections_oos: vehicleInspOos,
+      driver_inspections_total: driverInspTotal,
+      driver_inspections_oos: driverInspOos,
+      crashes_fatal: crashesFatal,
+      crashes_injury: crashesInjury,
+      crashes_towaway: crashesTowaway,
+      equipment: { straightTrucks, tractorTrailers, flatbeds, reefers, tankers, intermodal },
+      service_lanes: serviceLanes,
+      fmcsa_raw: {
+        ...existing,
         brandColor: sanitizeHexColor(primaryColor),
         companyDescription: sanitizeText(heroText, 1000),
-      } as Record<string, unknown>)
-      await supabase
-        .from('carriers')
-        .update({
-          fmcsa_raw: { ...existing, ...updateData },
-        })
-        .eq('id', carrier.id)
-    }
+      },
+    } as Record<string, unknown>)
 
+    await supabase.from('carriers').update(updatePayload).eq('id', carrier.id)
     await refreshCarrier()
     setIsSaving(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 3000)
+  }
+
+  // Logo upload
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !carrier) return
+
+    if (file.size > 2 * 1024 * 1024) {
+      setUploadError('Logo must be under 2MB.')
+      return
+    }
+    if (!['image/png', 'image/jpeg', 'image/svg+xml', 'image/webp'].includes(file.type)) {
+      setUploadError('Logo must be PNG, JPG, SVG, or WebP.')
+      return
+    }
+
+    setUploadingLogo(true)
+    setUploadError('')
+
+    const ext = file.name.split('.').pop()
+    const path = `${carrier.user_id}/logo.${ext}`
+
+    const { error: uploadErr } = await supabase.storage
+      .from('carrier-assets')
+      .upload(path, file, { upsert: true })
+
+    if (uploadErr) {
+      setUploadError(uploadErr.message)
+      setUploadingLogo(false)
+      return
+    }
+
+    const { data: urlData } = supabase.storage.from('carrier-assets').getPublicUrl(path)
+    const publicUrl = urlData.publicUrl + '?t=' + Date.now()
+
+    await supabase.from('carriers').update({ logo_url: publicUrl }).eq('id', carrier.id)
+    setLogoUrl(publicUrl)
+    await refreshCarrier()
+    setUploadingLogo(false)
+  }
+
+  // Document upload
+  const handleDocUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !carrier) return
+
+    if (file.size > 10 * 1024 * 1024) {
+      setUploadError('Document must be under 10MB.')
+      return
+    }
+
+    setUploadingDoc(true)
+    setUploadError('')
+
+    const timestamp = Date.now()
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+    const path = `${carrier.user_id}/docs/${timestamp}_${safeName}`
+
+    const { error: uploadErr } = await supabase.storage
+      .from('carrier-assets')
+      .upload(path, file)
+
+    if (uploadErr) {
+      setUploadError(uploadErr.message)
+      setUploadingDoc(false)
+      return
+    }
+
+    const { data: urlData } = supabase.storage.from('carrier-assets').getPublicUrl(path)
+
+    const docType = file.name.toLowerCase().includes('w9') || file.name.toLowerCase().includes('w-9')
+      ? 'W-9 Form'
+      : file.name.toLowerCase().includes('coi') || file.name.toLowerCase().includes('insurance')
+        ? 'Certificate of Insurance'
+        : file.name.toLowerCase().includes('agreement')
+          ? 'Carrier Agreement'
+          : 'Document'
+
+    const { data: newDoc } = await supabase.from('documents').insert({
+      carrier_id: carrier.id,
+      name: file.name,
+      type: docType,
+      file_url: urlData.publicUrl,
+    }).select().single()
+
+    if (newDoc) {
+      setDocuments(prev => [newDoc, ...prev])
+    }
+
+    setUploadingDoc(false)
+    if (docInputRef.current) docInputRef.current.value = ''
+  }
+
+  // Document delete
+  const removeDocument = async (doc: DocRow) => {
+    await supabase.from('documents').delete().eq('id', doc.id)
+    setDocuments(prev => prev.filter(d => d.id !== doc.id))
   }
 
   const addLane = () => {
@@ -77,9 +269,15 @@ function Settings() {
     setServiceLanes(serviceLanes.filter((_, i) => i !== index))
   }
 
-  const removeDocument = (index: number) => {
-    setDocuments(documents.filter((_, i) => i !== index))
-  }
+  const numInput = (value: number, setter: (v: number) => void) => (
+    <input
+      type="number"
+      min={0}
+      value={value}
+      onChange={(e) => setter(Math.max(0, parseInt(e.target.value) || 0))}
+      className="w-20 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white text-center focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+    />
+  )
 
   if (loading) {
     return (
@@ -106,33 +304,27 @@ function Settings() {
             className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 disabled:bg-orange-500/50 text-white font-semibold px-6 py-2.5 rounded-xl transition-all cursor-pointer"
           >
             {isSaving ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Saving...
-              </>
+              <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>
             ) : saved ? (
-              <>
-                <CheckCircle className="w-4 h-4" />
-                Saved!
-              </>
+              <><CheckCircle className="w-4 h-4" /> Saved!</>
             ) : (
-              <>
-                <Save className="w-4 h-4" />
-                Save Changes
-              </>
+              <><Save className="w-4 h-4" /> Save Changes</>
             )}
           </button>
         </div>
 
+        {uploadError && (
+          <div className="bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl px-4 py-3 text-sm mb-6">
+            {uploadError}
+            <button onClick={() => setUploadError('')} className="ml-2 text-red-300 hover:text-white cursor-pointer">&times;</button>
+          </div>
+        )}
+
         <div className="space-y-8">
           {/* Logo Upload */}
-          <SettingsSection
-            icon={<Image className="w-5 h-5" />}
-            title="Company Logo"
-            description="Upload your company logo. Displayed on your website and broker packet."
-          >
+          <SettingsSection icon={<Image className="w-5 h-5" />} title="Company Logo" description="Upload your company logo. Displayed on your website and broker packet.">
             <div className="flex items-center gap-6">
-              <div className="w-24 h-24 bg-gray-800 border-2 border-dashed border-gray-700 rounded-2xl flex items-center justify-center">
+              <div className="w-24 h-24 bg-gray-800 border-2 border-dashed border-gray-700 rounded-2xl flex items-center justify-center overflow-hidden">
                 {logoUrl ? (
                   <img src={logoUrl} alt="Logo" className="w-full h-full object-contain rounded-2xl" />
                 ) : (
@@ -140,128 +332,222 @@ function Settings() {
                 )}
               </div>
               <div>
-                <button className="flex items-center gap-2 text-sm bg-gray-800 hover:bg-gray-700 border border-gray-700 text-white px-4 py-2.5 rounded-lg transition-colors cursor-pointer">
-                  <Upload className="w-4 h-4" />
-                  Upload Logo
+                <input ref={logoInputRef} type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" onChange={handleLogoUpload} className="hidden" />
+                <button
+                  onClick={() => logoInputRef.current?.click()}
+                  disabled={uploadingLogo}
+                  className="flex items-center gap-2 text-sm bg-gray-800 hover:bg-gray-700 border border-gray-700 text-white px-4 py-2.5 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {uploadingLogo ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                  {uploadingLogo ? 'Uploading...' : 'Upload Logo'}
                 </button>
-                <p className="text-xs text-gray-500 mt-2">PNG, JPG, or SVG. Max 2MB. Recommended 512x512px.</p>
+                <p className="text-xs text-gray-500 mt-2">PNG, JPG, SVG, or WebP. Max 2MB.</p>
               </div>
             </div>
           </SettingsSection>
 
           {/* Brand Color */}
-          <SettingsSection
-            icon={<Palette className="w-5 h-5" />}
-            title="Brand Color"
-            description="Choose your primary accent color for your website."
-          >
+          <SettingsSection icon={<Palette className="w-5 h-5" />} title="Brand Color" description="Choose your primary accent color for your website.">
             <div className="flex items-center gap-4">
               <div className="flex gap-3">
-                {['#f97316', '#3b82f6', '#10b981', '#8b5cf6', '#ef4444', '#f59e0b', '#06b6d4', '#ec4899'].map(
-                  (color) => (
-                    <button
-                      key={color}
-                      onClick={() => setPrimaryColor(color)}
-                      className={`w-10 h-10 rounded-xl transition-all cursor-pointer ${
-                        primaryColor === color ? 'ring-2 ring-white ring-offset-2 ring-offset-gray-950 scale-110' : 'hover:scale-105'
-                      }`}
-                      style={{ backgroundColor: color }}
-                    />
-                  )
-                )}
+                {['#f97316', '#3b82f6', '#10b981', '#8b5cf6', '#ef4444', '#f59e0b', '#06b6d4', '#ec4899'].map((color) => (
+                  <button key={color} onClick={() => setPrimaryColor(color)} className={`w-10 h-10 rounded-xl transition-all cursor-pointer ${primaryColor === color ? 'ring-2 ring-white ring-offset-2 ring-offset-gray-950 scale-110' : 'hover:scale-105'}`} style={{ backgroundColor: color }} />
+                ))}
               </div>
-              <div className="flex items-center gap-2 ml-4">
-                <input
-                  type="text"
-                  value={primaryColor}
-                  onChange={(e) => setPrimaryColor(sanitizeHexColor(e.target.value))}
-                  className="w-28 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white font-mono focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                />
+              <input type="text" value={primaryColor} onChange={(e) => setPrimaryColor(sanitizeHexColor(e.target.value))} className="w-28 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white font-mono focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent ml-4" />
+            </div>
+          </SettingsSection>
+
+          {/* Company Description */}
+          <SettingsSection icon={<FileText className="w-5 h-5" />} title="Company Description" description="Describe your company, services, and what sets you apart.">
+            <textarea value={heroText} onChange={(e) => setHeroText(sanitizeText(e.target.value, 1000))} rows={5} className="w-full px-4 py-3.5 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all resize-none" />
+            <p className="text-xs text-gray-500 mt-2">{heroText.length} / 1000 characters</p>
+          </SettingsSection>
+
+          {/* Contact Info */}
+          <SettingsSection icon={<Phone className="w-5 h-5" />} title="Contact Information" description="Phone and email displayed on your website.">
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs text-gray-400 mb-1.5">Phone</label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                  <input type="text" value={phone} onChange={(e) => setPhone(sanitizeText(e.target.value, 30))} placeholder="(555) 123-4567" className="w-full pl-10 pr-4 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1.5">Email</label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                  <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="dispatch@company.com" className="w-full pl-10 pr-4 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent" />
+                </div>
               </div>
             </div>
           </SettingsSection>
 
-          {/* Company Description / Hero Text */}
-          <SettingsSection
-            icon={<FileText className="w-5 h-5" />}
-            title="Company Description"
-            description="Describe your company, services, and what sets you apart."
-          >
-            <textarea
-              value={heroText}
-              onChange={(e) => setHeroText(sanitizeText(e.target.value, 1000))}
-              rows={5}
-              className="w-full px-4 py-3.5 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all resize-none"
-            />
-            <p className="text-xs text-gray-500 mt-2">{heroText.length} / 1000 characters</p>
+          {/* Physical Address */}
+          <SettingsSection icon={<Home className="w-5 h-5" />} title="Physical Address" description="Your company's physical location.">
+            <div className="space-y-3">
+              <input type="text" value={addressStreet} onChange={(e) => setAddressStreet(sanitizeText(e.target.value, 200))} placeholder="Street address" className="w-full px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent" />
+              <div className="grid grid-cols-3 gap-3">
+                <input type="text" value={addressCity} onChange={(e) => setAddressCity(sanitizeText(e.target.value, 100))} placeholder="City" className="px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent" />
+                <input type="text" value={addressState} onChange={(e) => setAddressState(sanitizeText(e.target.value, 50))} placeholder="State" className="px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent" />
+                <input type="text" value={addressZip} onChange={(e) => setAddressZip(sanitizeText(e.target.value, 20))} placeholder="ZIP" className="px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent" />
+              </div>
+            </div>
+            <div className="mt-5">
+              <p className="text-xs text-gray-400 mb-2 font-medium">Mailing Address (if different)</p>
+              <div className="space-y-3">
+                <input type="text" value={mailingStreet} onChange={(e) => setMailingStreet(sanitizeText(e.target.value, 200))} placeholder="Mailing street address" className="w-full px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent" />
+                <div className="grid grid-cols-3 gap-3">
+                  <input type="text" value={mailingCity} onChange={(e) => setMailingCity(sanitizeText(e.target.value, 100))} placeholder="City" className="px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent" />
+                  <input type="text" value={mailingState} onChange={(e) => setMailingState(sanitizeText(e.target.value, 50))} placeholder="State" className="px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent" />
+                  <input type="text" value={mailingZip} onChange={(e) => setMailingZip(sanitizeText(e.target.value, 20))} placeholder="ZIP" className="px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent" />
+                </div>
+              </div>
+            </div>
+          </SettingsSection>
+
+          {/* Insurance */}
+          <SettingsSection icon={<ShieldCheck className="w-5 h-5" />} title="Insurance Details" description="Policy numbers and insurer names displayed on your profile and broker packet.">
+            <div className="grid sm:grid-cols-2 gap-6">
+              <div className="space-y-3">
+                <p className="text-sm font-medium text-gray-300">BIPD (Liability)</p>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Insurer</label>
+                  <input type="text" value={bipdInsurer} onChange={(e) => setBipdInsurer(sanitizeText(e.target.value, 200))} placeholder="e.g. National Interstate Insurance Co." className="w-full px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent" />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Policy Number</label>
+                  <input type="text" value={bipdPolicyNumber} onChange={(e) => setBipdPolicyNumber(sanitizeText(e.target.value, 100))} placeholder="e.g. BPD-2024-881742" className="w-full px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white text-sm font-mono placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent" />
+                </div>
+              </div>
+              <div className="space-y-3">
+                <p className="text-sm font-medium text-gray-300">Cargo</p>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Insurer</label>
+                  <input type="text" value={cargoInsurer} onChange={(e) => setCargoInsurer(sanitizeText(e.target.value, 200))} placeholder="e.g. Great West Casualty Company" className="w-full px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent" />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Policy Number</label>
+                  <input type="text" value={cargoPolicyNumber} onChange={(e) => setCargoPolicyNumber(sanitizeText(e.target.value, 100))} placeholder="e.g. CRG-2024-553291" className="w-full px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white text-sm font-mono placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent" />
+                </div>
+              </div>
+            </div>
+          </SettingsSection>
+
+          {/* Equipment */}
+          <SettingsSection icon={<Truck className="w-5 h-5" />} title="Fleet Equipment" description="Your equipment breakdown displayed on your profile.">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              {[
+                { label: 'Straight Trucks', value: straightTrucks, setter: setStraightTrucks },
+                { label: 'Tractor Trailers', value: tractorTrailers, setter: setTractorTrailers },
+                { label: 'Flatbeds', value: flatbeds, setter: setFlatbeds },
+                { label: 'Reefers', value: reefers, setter: setReefers },
+                { label: 'Tankers', value: tankers, setter: setTankers },
+                { label: 'Intermodal', value: intermodal, setter: setIntermodal },
+              ].map((item) => (
+                <div key={item.label} className="flex items-center justify-between bg-gray-800/50 border border-gray-700/50 rounded-xl px-4 py-3">
+                  <span className="text-sm text-gray-400">{item.label}</span>
+                  {numInput(item.value, item.setter)}
+                </div>
+              ))}
+            </div>
+          </SettingsSection>
+
+          {/* Inspections & Crashes */}
+          <SettingsSection icon={<AlertTriangle className="w-5 h-5" />} title="Inspections & Crash History" description="Safety record data for your profile and broker packet.">
+            <div className="grid sm:grid-cols-2 gap-6">
+              <div className="space-y-3">
+                <p className="text-sm font-medium text-gray-300">Vehicle Inspections</p>
+                <div className="flex items-center gap-4">
+                  <div className="flex-1">
+                    <label className="block text-xs text-gray-500 mb-1">Total</label>
+                    {numInput(vehicleInspTotal, setVehicleInspTotal)}
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-xs text-gray-500 mb-1">Out of Service</label>
+                    {numInput(vehicleInspOos, setVehicleInspOos)}
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <p className="text-sm font-medium text-gray-300">Driver Inspections</p>
+                <div className="flex items-center gap-4">
+                  <div className="flex-1">
+                    <label className="block text-xs text-gray-500 mb-1">Total</label>
+                    {numInput(driverInspTotal, setDriverInspTotal)}
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-xs text-gray-500 mb-1">Out of Service</label>
+                    {numInput(driverInspOos, setDriverInspOos)}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="mt-6 pt-5 border-t border-gray-800">
+              <p className="text-sm font-medium text-gray-300 mb-3">Crash History</p>
+              <div className="flex items-center gap-6">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Fatal</label>
+                  {numInput(crashesFatal, setCrashesFatal)}
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Injury</label>
+                  {numInput(crashesInjury, setCrashesInjury)}
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Towaway</label>
+                  {numInput(crashesTowaway, setCrashesTowaway)}
+                </div>
+              </div>
+            </div>
           </SettingsSection>
 
           {/* Service Lanes */}
-          <SettingsSection
-            icon={<MapPin className="w-5 h-5" />}
-            title="Service Lanes"
-            description="Define the routes and regions you service."
-          >
+          <SettingsSection icon={<MapPin className="w-5 h-5" />} title="Service Lanes" description="Define the routes and regions you service.">
             <div className="space-y-3">
               {serviceLanes.map((lane, i) => (
                 <div key={i} className="flex items-center gap-3">
-                  <div className="flex-1 px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-sm text-gray-300">
-                    {lane}
-                  </div>
-                  <button
-                    onClick={() => removeLane(i)}
-                    className="text-gray-500 hover:text-red-400 transition-colors cursor-pointer p-2"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
+                  <div className="flex-1 px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-sm text-gray-300">{lane}</div>
+                  <button onClick={() => removeLane(i)} className="text-gray-500 hover:text-red-400 transition-colors cursor-pointer p-2"><X className="w-4 h-4" /></button>
                 </div>
               ))}
               <div className="flex items-center gap-3">
-                <input
-                  type="text"
-                  value={newLane}
-                  onChange={(e) => setNewLane(sanitizeText(e.target.value, 100))}
-                  onKeyDown={(e) => e.key === 'Enter' && addLane()}
-                  placeholder="e.g. Texas to California"
-                  className="flex-1 px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
-                />
-                <button
-                  onClick={addLane}
-                  disabled={!newLane.trim()}
-                  className="flex items-center gap-1.5 text-sm bg-gray-800 hover:bg-gray-700 disabled:opacity-50 border border-gray-700 text-white px-4 py-3 rounded-xl transition-colors cursor-pointer"
-                >
-                  <Plus className="w-4 h-4" />
-                  Add
-                </button>
+                <input type="text" value={newLane} onChange={(e) => setNewLane(sanitizeText(e.target.value, 100))} onKeyDown={(e) => e.key === 'Enter' && addLane()} placeholder="e.g. Texas to California" className="flex-1 px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all" />
+                <button onClick={addLane} disabled={!newLane.trim()} className="flex items-center gap-1.5 text-sm bg-gray-800 hover:bg-gray-700 disabled:opacity-50 border border-gray-700 text-white px-4 py-3 rounded-xl transition-colors cursor-pointer"><Plus className="w-4 h-4" /> Add</button>
               </div>
             </div>
           </SettingsSection>
 
           {/* Documents */}
-          <SettingsSection
-            icon={<FileText className="w-5 h-5" />}
-            title="Documents"
-            description="Upload W-9, insurance certificates, carrier agreements, and other documents."
-          >
+          <SettingsSection icon={<FileText className="w-5 h-5" />} title="Documents" description="Upload W-9, insurance certificates, carrier agreements, and other documents.">
             <div className="space-y-3">
-              {documents.map((doc, i) => (
-                <div key={i} className="flex items-center gap-4 bg-gray-800/50 border border-gray-700/50 rounded-xl px-4 py-3">
-                  <FileText className="w-5 h-5 text-orange-500 flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{doc.name}</p>
-                    <p className="text-xs text-gray-500">{doc.type} &middot; Uploaded {doc.date}</p>
-                  </div>
-                  <button
-                    onClick={() => removeDocument(i)}
-                    className="text-gray-500 hover:text-red-400 transition-colors cursor-pointer p-1"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+              {docsLoading ? (
+                <div className="flex items-center gap-2 text-gray-500 text-sm py-4">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Loading documents...
                 </div>
-              ))}
-              <button className="w-full flex items-center justify-center gap-2 text-sm bg-gray-800 hover:bg-gray-700 border border-dashed border-gray-600 text-gray-400 hover:text-white px-4 py-4 rounded-xl transition-colors cursor-pointer">
-                <Upload className="w-4 h-4" />
-                Upload Document
+              ) : documents.length === 0 ? (
+                <p className="text-sm text-gray-500 py-2">No documents uploaded yet.</p>
+              ) : (
+                documents.map((doc) => (
+                  <div key={doc.id} className="flex items-center gap-4 bg-gray-800/50 border border-gray-700/50 rounded-xl px-4 py-3">
+                    <FileText className="w-5 h-5 text-orange-500 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <a href={doc.file_url} target="_blank" rel="noopener noreferrer" className="text-sm font-medium truncate block hover:text-orange-400 transition-colors">{doc.name}</a>
+                      <p className="text-xs text-gray-500">{doc.type} &middot; {new Date(doc.created_at).toLocaleDateString()}</p>
+                    </div>
+                    <button onClick={() => removeDocument(doc)} className="text-gray-500 hover:text-red-400 transition-colors cursor-pointer p-1"><Trash2 className="w-4 h-4" /></button>
+                  </div>
+                ))
+              )}
+              <input ref={docInputRef} type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={handleDocUpload} className="hidden" />
+              <button
+                onClick={() => docInputRef.current?.click()}
+                disabled={uploadingDoc}
+                className="w-full flex items-center justify-center gap-2 text-sm bg-gray-800 hover:bg-gray-700 border border-dashed border-gray-600 text-gray-400 hover:text-white px-4 py-4 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
+              >
+                {uploadingDoc ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                {uploadingDoc ? 'Uploading...' : 'Upload Document'}
               </button>
               <p className="text-xs text-gray-500">PDF, PNG, or JPG. Max 10MB per file.</p>
             </div>
@@ -270,13 +556,8 @@ function Settings() {
           {/* Danger Zone */}
           <div className="bg-red-500/5 border border-red-500/20 rounded-2xl p-6">
             <h3 className="text-lg font-semibold text-red-400 mb-2">Danger Zone</h3>
-            <p className="text-sm text-gray-400 mb-4">
-              Permanently delete your carrier website and all associated data. This action cannot be undone.
-            </p>
-            <button className="flex items-center gap-2 text-sm bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 px-4 py-2.5 rounded-lg transition-colors cursor-pointer">
-              <Trash2 className="w-4 h-4" />
-              Delete My Site
-            </button>
+            <p className="text-sm text-gray-400 mb-4">Permanently delete your carrier website and all associated data. This action cannot be undone.</p>
+            <button className="flex items-center gap-2 text-sm bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 px-4 py-2.5 rounded-lg transition-colors cursor-pointer"><Trash2 className="w-4 h-4" /> Delete My Site</button>
           </div>
         </div>
       </main>
@@ -286,23 +567,11 @@ function Settings() {
   )
 }
 
-function SettingsSection({
-  icon,
-  title,
-  description,
-  children,
-}: {
-  icon: React.ReactNode
-  title: string
-  description: string
-  children: React.ReactNode
-}) {
+function SettingsSection({ icon, title, description, children }: { icon: React.ReactNode; title: string; description: string; children: React.ReactNode }) {
   return (
     <div className="bg-gray-900/50 border border-gray-800 rounded-2xl p-6">
       <div className="flex items-start gap-3 mb-5">
-        <div className="w-10 h-10 bg-orange-500/10 rounded-xl flex items-center justify-center text-orange-500 flex-shrink-0">
-          {icon}
-        </div>
+        <div className="w-10 h-10 bg-orange-500/10 rounded-xl flex items-center justify-center text-orange-500 flex-shrink-0">{icon}</div>
         <div>
           <h2 className="text-lg font-semibold">{title}</h2>
           <p className="text-sm text-gray-400">{description}</p>
