@@ -15,8 +15,32 @@ import DataRequest from './pages/DataRequest'
 import ProtectedRoute from './components/ProtectedRoute'
 import ErrorBoundary from './components/ErrorBoundary'
 import CookieConsent from './components/CookieConsent'
+import { useDomainContext } from './hooks/useDomainContext'
 
 function App() {
+  const { mode, slug, carrierHostname } = useDomainContext()
+
+  // Subdomain access: render carrier profile as the entire site
+  if (mode === 'subdomain' && slug) {
+    return (
+      <ErrorBoundary>
+        <Profile subdomainSlug={slug} />
+        <CookieConsent />
+      </ErrorBoundary>
+    )
+  }
+
+  // Custom domain access: look up carrier by hostname
+  if (mode === 'custom-domain' && carrierHostname) {
+    return (
+      <ErrorBoundary>
+        <Profile customDomain={carrierHostname} />
+        <CookieConsent />
+      </ErrorBoundary>
+    )
+  }
+
+  // Main domain: normal routing
   return (
     <ErrorBoundary>
       <Routes>

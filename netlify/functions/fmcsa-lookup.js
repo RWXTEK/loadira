@@ -25,9 +25,15 @@ function checkServerRateLimit(ip) {
 }
 
 function corsHeaders(origin) {
-  const allowed = !origin || origin === ALLOWED_ORIGIN || origin.startsWith('http://localhost')
+  const isAllowed = !origin
+    || origin === ALLOWED_ORIGIN
+    || origin?.startsWith('http://localhost')
+    || (origin?.startsWith('https://') && origin.endsWith('.loadira.com'))
+  // For custom domains, we allow any HTTPS origin (the profile pages need FMCSA data)
+  // The function itself doesn't expose sensitive data — only public FMCSA info
+  const allowedOrigin = isAllowed ? (origin || ALLOWED_ORIGIN) : (origin?.startsWith('https://') ? origin : ALLOWED_ORIGIN)
   return {
-    'Access-Control-Allow-Origin': allowed ? (origin || ALLOWED_ORIGIN) : ALLOWED_ORIGIN,
+    'Access-Control-Allow-Origin': allowedOrigin,
     'Access-Control-Allow-Headers': 'Content-Type',
     'Content-Type': 'application/json',
   }

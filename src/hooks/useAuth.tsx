@@ -60,6 +60,10 @@ export interface Carrier {
   stripe_customer_id?: string | null
   stripe_subscription_id?: string | null
   fmcsa_raw?: Record<string, unknown> | null
+  custom_domain?: string | null
+  custom_domain_status?: string | null
+  terms_accepted_at?: string | null
+  age_confirmed?: boolean | null
   updated_at?: string
 }
 

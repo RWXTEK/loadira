@@ -26,41 +26,63 @@ import LoadiraLogo from '../components/LoadiraLogo'
 import { FmcsaBanner } from '../components/FmcsaDisclaimer'
 import type { CarrierData } from '../lib/mockFmcsa'
 
-function Profile() {
-  const { slug } = useParams<{ slug: string }>()
+function Profile({ subdomainSlug, customDomain }: { subdomainSlug?: string; customDomain?: string } = {}) {
+  const { slug: routeSlug } = useParams<{ slug: string }>()
+  const effectiveSlug = subdomainSlug || routeSlug
   const [carrier, setCarrier] = useState<CarrierData & { carrierId: string }>({ ...mockCarrier, carrierId: '' })
   const [loading, setLoading] = useState(true)
-  // showDisclaimer state removed — using shared FmcsaBanner component
+  const [notFound, setNotFound] = useState(false)
 
   useEffect(() => {
     async function fetchCarrier() {
-      if (!slug) {
-        setLoading(false)
-        return
-      }
+      let carrierRow = null
 
-      // Look up carrier by website_slug
-      const { data: carrierRow } = await supabase
-        .from('carriers')
-        .select('*')
-        .eq('website_slug', slug)
-        .single()
+      if (effectiveSlug) {
+        // Look up by website_slug (subdomain or route param)
+        const { data } = await supabase
+          .from('carriers')
+          .select('*')
+          .eq('website_slug', effectiveSlug)
+          .single()
+        carrierRow = data
+      } else if (customDomain) {
+        // Look up by custom_domain
+        const { data } = await supabase
+          .from('carriers')
+          .select('*')
+          .eq('custom_domain', customDomain)
+          .single()
+        carrierRow = data
+      }
 
       if (carrierRow) {
         const display = buildCarrierDisplay(carrierRow as Carrier)
         setCarrier({ ...display, carrierId: carrierRow.id })
+      } else if (effectiveSlug || customDomain) {
+        setNotFound(true)
       }
-      // If no data found, fall back to mockCarrier (already set as default)
       setLoading(false)
     }
 
     fetchCarrier()
-  }, [slug])
+  }, [effectiveSlug, customDomain])
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center">
         <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
+      </div>
+    )
+  }
+
+  if (notFound) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center px-6">
+        <div className="text-center">
+          <h1 className="text-4xl font-bold text-white mb-4">Carrier Not Found</h1>
+          <p className="text-gray-400 mb-6">This carrier profile doesn't exist or has been removed.</p>
+          <a href="https://loadira.com" className="bg-orange-500 hover:bg-orange-600 text-white font-semibold px-6 py-3 rounded-xl transition-all">Go to Loadira</a>
+        </div>
       </div>
     )
   }

@@ -17,10 +17,15 @@ import {
   ShieldCheck,
   AlertTriangle,
   Home,
+  Globe,
+  Copy,
+  ExternalLink,
+  Link as LinkIcon,
 } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { useAuth } from '../hooks/useAuth'
+import { useSubscription } from '../hooks/useSubscription'
 import { supabase } from '../lib/supabase'
 import { sanitizeText, sanitizeHexColor, sanitizeForDb } from '../lib/sanitize'
 
@@ -109,6 +114,16 @@ function Settings() {
     Array.isArray(carrier?.service_lanes) && carrier.service_lanes.length > 0 ? carrier.service_lanes : []
   )
   const [newLane, setNewLane] = useState('')
+
+  // Custom domain
+  const [customDomain, setCustomDomain] = useState(carrier?.custom_domain || '')
+  const [domainStatus, setDomainStatus] = useState(carrier?.custom_domain_status || 'none')
+  const [savingDomain, setSavingDomain] = useState(false)
+  const [domainError, setDomainError] = useState('')
+  const [copied, setCopied] = useState(false)
+  const { hasFeature } = useSubscription()
+  const canUseCustomDomain = hasFeature('customDomain')
+  const subdomainUrl = carrier?.website_slug ? `${carrier.website_slug}.loadira.com` : ''
 
   // Documents from DB
   const [documents, setDocuments] = useState<DocRow[]>([])
@@ -311,6 +326,92 @@ function Settings() {
     setServiceLanes(serviceLanes.filter((_, i) => i !== index))
   }
 
+  const copySubdomain = () => {
+    navigator.clipboard.writeText(`https://${subdomainUrl}`)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  const handleSaveDomain = async () => {
+    if (!carrier || !canUseCustomDomain) return
+    setDomainError('')
+
+    const clean = customDomain.toLowerCase().replace(/[^a-z0-9.-]/g, '').replace(/^(https?:\/\/)?(www\.)?/, '')
+    if (!clean) {
+      // Remove custom domain
+      setSavingDomain(true)
+      await supabase.from('carriers').update({ custom_domain: null, custom_domain_status: 'none' }).eq('id', carrier.id)
+      setDomainStatus('none')
+      setCustomDomain('')
+      await refreshCarrier()
+      setSavingDomain(false)
+      return
+    }
+
+    if (!clean.includes('.') || clean.length > 253) {
+      setDomainError('Please enter a valid domain (e.g., mycarrier.com)')
+      return
+    }
+    if (clean.endsWith('.loadira.com') || clean === 'loadira.com') {
+      setDomainError('Cannot use loadira.com as a custom domain. Your subdomain is already active.')
+      return
+    }
+
+    setSavingDomain(true)
+
+    // Save to DB
+    const { error: dbErr } = await supabase.from('carriers').update({
+      custom_domain: clean,
+      custom_domain_status: 'pending',
+    }).eq('id', carrier.id)
+
+    if (dbErr) {
+      setDomainError('Failed to save domain. It may already be in use.')
+      setSavingDomain(false)
+      return
+    }
+
+    // Provision on Netlify
+    try {
+      const res = await fetch('/.netlify/functions/provision-domain', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domain: clean }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setDomainStatus('pending')
+        setCustomDomain(clean)
+      } else {
+        setDomainError(data.error || 'Failed to provision domain')
+      }
+    } catch {
+      setDomainError('Failed to connect to provisioning service')
+    }
+
+    await refreshCarrier()
+    setSavingDomain(false)
+  }
+
+  const removeDomain = async () => {
+    if (!carrier || !customDomain) return
+    setSavingDomain(true)
+
+    try {
+      await fetch('/.netlify/functions/provision-domain', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domain: customDomain }),
+      })
+    } catch { /* ignore */ }
+
+    await supabase.from('carriers').update({ custom_domain: null, custom_domain_status: 'none' }).eq('id', carrier.id)
+    setCustomDomain('')
+    setDomainStatus('none')
+    await refreshCarrier()
+    setSavingDomain(false)
+  }
+
   const numInput = (value: number, setter: (v: number) => void) => (
     <input
       type="number"
@@ -363,6 +464,110 @@ function Settings() {
         )}
 
         <div className="space-y-8">
+          {/* Domain Management */}
+          <SettingsSection icon={<Globe className="w-5 h-5" />} title="Domain & URL" description="Your carrier website address. Share with brokers and shippers.">
+            {/* Subdomain (always available) */}
+            <div className="mb-5">
+              <label className="block text-xs text-gray-400 mb-1.5 font-medium">Your Loadira Subdomain</label>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 flex items-center bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm">
+                  <LinkIcon className="w-4 h-4 text-gray-500 mr-2 flex-shrink-0" />
+                  <span className="text-amber-400 font-medium truncate">{subdomainUrl || 'your-carrier.loadira.com'}</span>
+                </div>
+                <button onClick={copySubdomain} disabled={!subdomainUrl} className="flex items-center gap-1.5 text-sm bg-gray-800 hover:bg-gray-700 border border-gray-700 text-white px-3 py-2.5 rounded-xl transition-colors cursor-pointer disabled:opacity-50" aria-label="Copy subdomain URL">
+                  {copied ? <CheckCircle className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                </button>
+                {subdomainUrl && (
+                  <a href={`https://${subdomainUrl}`} target="_blank" rel="noopener noreferrer" className="flex items-center text-sm bg-gray-800 hover:bg-gray-700 border border-gray-700 text-white px-3 py-2.5 rounded-xl transition-colors" aria-label="Open subdomain">
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
+                )}
+              </div>
+              <p className="text-xs text-gray-500 mt-1.5">This is always active. Anyone can view your carrier profile at this address.</p>
+            </div>
+
+            {/* Custom Domain (paid plans) */}
+            <div className="pt-5 border-t border-gray-800">
+              <div className="flex items-center justify-between mb-3">
+                <label className="block text-xs text-gray-400 font-medium">Custom Domain</label>
+                {!canUseCustomDomain && (
+                  <a href="/pricing" className="text-xs text-amber-400 hover:text-amber-300">Upgrade to Professional</a>
+                )}
+              </div>
+
+              {canUseCustomDomain ? (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={customDomain}
+                      onChange={(e) => setCustomDomain(e.target.value.toLowerCase().replace(/[^a-z0-9.-]/g, ''))}
+                      placeholder="www.mycarrier.com"
+                      className="flex-1 px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                    />
+                    <button onClick={handleSaveDomain} disabled={savingDomain} className="flex items-center gap-1.5 text-sm bg-amber-500 hover:bg-amber-400 text-gray-950 font-semibold px-4 py-2.5 rounded-xl transition-colors cursor-pointer disabled:opacity-50">
+                      {savingDomain ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Connect'}
+                    </button>
+                  </div>
+
+                  {domainError && <p className="text-red-400 text-xs">{domainError}</p>}
+
+                  {/* Domain status */}
+                  {domainStatus === 'pending' && customDomain && (
+                    <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 space-y-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                        <span className="text-sm font-medium text-amber-300">DNS Pending</span>
+                      </div>
+                      <p className="text-xs text-amber-300/70">Add this DNS record at your domain registrar:</p>
+                      <div className="bg-gray-900 rounded-lg p-3 font-mono text-xs space-y-2">
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Type</span>
+                          <span className="text-white">CNAME</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Name</span>
+                          <span className="text-white">{customDomain.startsWith('www.') ? 'www' : '@'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Value</span>
+                          <span className="text-amber-400">loadira.com</span>
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-500">DNS changes can take up to 48 hours to propagate. SSL is auto-provisioned by Netlify after DNS is verified.</p>
+                    </div>
+                  )}
+
+                  {domainStatus === 'verified' && customDomain && (
+                    <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4 text-emerald-400" />
+                        <span className="text-sm text-emerald-300 font-medium">{customDomain} is active</span>
+                      </div>
+                      <button onClick={removeDomain} disabled={savingDomain} className="text-xs text-red-400 hover:text-red-300 cursor-pointer">Remove</button>
+                    </div>
+                  )}
+
+                  {domainStatus === 'error' && customDomain && (
+                    <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4 text-red-400" />
+                        <span className="text-sm text-red-300">DNS verification failed — check your records</span>
+                      </div>
+                      <button onClick={removeDomain} disabled={savingDomain} className="text-xs text-red-400 hover:text-red-300 cursor-pointer">Remove</button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-4 text-center">
+                  <Globe className="w-8 h-8 text-gray-600 mx-auto mb-2" />
+                  <p className="text-sm text-gray-400 mb-1">Use your own domain</p>
+                  <p className="text-xs text-gray-500">Available on Professional and Fleet plans</p>
+                </div>
+              )}
+            </div>
+          </SettingsSection>
+
           {/* Logo Upload */}
           <SettingsSection icon={<Image className="w-5 h-5" />} title="Company Logo" description="Upload your company logo. Displayed on your website and broker packet.">
             <div className="flex items-center gap-6">
