@@ -8,6 +8,8 @@ import BrokerPacket from './pages/BrokerPacket'
 import Pricing from './pages/Pricing'
 import Settings from './pages/Settings'
 import ResetPassword from './pages/ResetPassword'
+import Terms from './pages/Terms'
+import Privacy from './pages/Privacy'
 import ProtectedRoute from './components/ProtectedRoute'
 import ErrorBoundary from './components/ErrorBoundary'
 
@@ -20,6 +22,8 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/terms" element={<Terms />} />
+        <Route path="/privacy" element={<Privacy />} />
         <Route path="/profile/:slug" element={<Profile />} />
         <Route
           path="/dashboard"

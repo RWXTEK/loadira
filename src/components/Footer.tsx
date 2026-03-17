@@ -36,9 +36,8 @@ function Footer() {
           <div>
             <h4 className="text-sm font-semibold text-white mb-4">Company</h4>
             <ul className="space-y-2.5">
-              <FooterLink to="#">About</FooterLink>
-              <FooterLink to="#">Terms of Service</FooterLink>
-              <FooterLink to="#">Privacy Policy</FooterLink>
+              <FooterLink to="/terms">Terms of Service</FooterLink>
+              <FooterLink to="/privacy">Privacy Policy</FooterLink>
             </ul>
           </div>
         </div>
