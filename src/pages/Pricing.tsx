@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import { FmcsaBanner } from '../components/FmcsaDisclaimer'
 
 const PLANS = [
   {
@@ -71,7 +72,7 @@ function Pricing() {
 
   const handleCheckout = async (plan: (typeof PLANS)[0]) => {
     if (plan.id === 'fleet') {
-      window.location.href = 'mailto:customertek@rwxtek.com?subject=CarrierShield Fleet Inquiry'
+      window.location.href = 'mailto:customertek@rwxtek.com?subject=Loadira Fleet Inquiry'
       return
     }
 
@@ -109,6 +110,7 @@ function Pricing() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white flex flex-col">
+      <FmcsaBanner />
       <Navbar />
 
       <main className="flex-1">
@@ -258,6 +260,13 @@ function Pricing() {
               </div>
             ))}
           </div>
+        {/* Legal Disclaimer */}
+        <div className="mt-12 max-w-2xl mx-auto text-center">
+          <p className="text-xs text-gray-600 leading-relaxed">
+            A Loadira subscription provides website hosting and FMCSA data display tools only. A subscription does not guarantee broker acceptance, freight load availability, SBA loan approval, or any specific business outcome. All carrier data is provided "as-is" from FMCSA government sources and may not be current. Carriers are solely responsible for the accuracy of all information displayed on their profiles. See our{' '}
+            <a href="/terms" className="text-amber-500 hover:text-amber-400 underline">Terms of Service</a> for full details.
+          </p>
+        </div>
         </div>
       </main>
 

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { FileText, Globe, ChevronRight, Star, Zap, Clock, Loader2, CheckCircle, Users, MapPin, ArrowRight, Shield, Truck } from 'lucide-react'
 import { lookupByMcNumber } from '../lib/fmcsaApi'
 import { sanitizeMcNumber } from '../lib/sanitize'
+import { FmcsaBanner } from '../components/FmcsaDisclaimer'
 import LoadiraLogo from '../components/LoadiraLogo'
 import type { FmcsaCarrier } from '../lib/fmcsaApi'
 
@@ -40,6 +41,7 @@ function Landing() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
+      <FmcsaBanner />
       {/* Navigation */}
       <nav className="border-b border-gray-800/50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">

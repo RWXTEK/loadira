@@ -23,12 +23,14 @@ import { sanitizeText, isValidEmail, sanitizeForDb } from '../lib/sanitize'
 import { mockCarrier, buildCarrierDisplay, getSafetyRatingColor, formatCurrency } from '../lib/mockFmcsa'
 import type { Carrier } from '../hooks/useAuth'
 import LoadiraLogo from '../components/LoadiraLogo'
+import { FmcsaBanner } from '../components/FmcsaDisclaimer'
 import type { CarrierData } from '../lib/mockFmcsa'
 
 function Profile() {
   const { slug } = useParams<{ slug: string }>()
   const [carrier, setCarrier] = useState<CarrierData & { carrierId: string }>({ ...mockCarrier, carrierId: '' })
   const [loading, setLoading] = useState(true)
+  // showDisclaimer state removed — using shared FmcsaBanner component
 
   useEffect(() => {
     async function fetchCarrier() {
@@ -83,6 +85,8 @@ function Profile() {
           </a>
         </div>
       </nav>
+
+      <FmcsaBanner />
 
       {/* Hero Banner */}
       <section className="relative overflow-hidden bg-gradient-to-b from-orange-500/5 to-gray-950">

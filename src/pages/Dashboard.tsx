@@ -21,6 +21,7 @@ import Footer from '../components/Footer'
 import BillingCard from '../components/BillingCard'
 import { useAuth } from '../hooks/useAuth'
 import { buildCarrierDisplay, getSafetyRatingColor, formatCurrency } from '../lib/mockFmcsa'
+import { DataDisclaimerFooter } from '../components/FmcsaDisclaimer'
 
 function Dashboard() {
   const { carrier: carrierRow, loading } = useAuth()
@@ -226,6 +227,8 @@ function Dashboard() {
             />
           </div>
         </div>
+
+        <DataDisclaimerFooter />
       </main>
 
       <Footer />

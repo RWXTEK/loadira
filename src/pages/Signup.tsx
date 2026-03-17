@@ -27,6 +27,7 @@ function Signup() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [signupError, setSignupError] = useState('')
   const [agreedToTerms, setAgreedToTerms] = useState(false)
+  const [confirmedAge, setConfirmedAge] = useState(false)
 
   // Auto-lookup if MC number came from landing page
   useEffect(() => {
@@ -62,7 +63,7 @@ function Signup() {
 
   const handleCreateAccount = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!agreedToTerms || !fmcsaResult) return
+    if (!agreedToTerms || !confirmedAge || !fmcsaResult) return
 
     // Validate inputs
     const cleanName = sanitizeText(fullName, 100)
@@ -126,6 +127,8 @@ function Signup() {
           legal_name: sanitizeText(fmcsaResult.legalName, 200),
           website_slug: slug,
           fmcsa_raw: fmcsaRaw,
+          terms_accepted_at: new Date().toISOString(),
+          age_confirmed: true,
         })
 
       if (carrierError) {
@@ -363,20 +366,34 @@ function Signup() {
                       className="mt-1 w-4 h-4 rounded border-gray-600 bg-gray-800 text-orange-500 focus:ring-orange-500 accent-orange-500"
                     />
                     <label htmlFor="terms" className="text-sm text-gray-400">
-                      I agree to the{' '}
-                      <a href="#" className="text-orange-500 hover:text-orange-400">
+                      I have read and agree to the{' '}
+                      <a href="/terms" target="_blank" className="text-orange-500 hover:text-orange-400 underline">
                         Terms of Service
                       </a>{' '}
                       and{' '}
-                      <a href="#" className="text-orange-500 hover:text-orange-400">
+                      <a href="/privacy" target="_blank" className="text-orange-500 hover:text-orange-400 underline">
                         Privacy Policy
                       </a>
+                      , including the FMCSA data accuracy disclaimer and limitation of liability.
+                    </label>
+                  </div>
+
+                  <div className="flex items-start gap-3">
+                    <input
+                      id="age-confirm"
+                      type="checkbox"
+                      checked={confirmedAge}
+                      onChange={(e) => setConfirmedAge(e.target.checked)}
+                      className="mt-1 w-4 h-4 rounded border-gray-600 bg-gray-800 text-orange-500 focus:ring-orange-500 accent-orange-500"
+                    />
+                    <label htmlFor="age-confirm" className="text-sm text-gray-400">
+                      I confirm that I am at least 18 years old and have the legal authority to represent this carrier.
                     </label>
                   </div>
 
                   <button
                     type="submit"
-                    disabled={!fullName || !email || !password || !agreedToTerms || isSubmitting || !isValidEmail(email) || !isValidPassword(password)}
+                    disabled={!fullName || !email || !password || !agreedToTerms || !confirmedAge || isSubmitting || !isValidEmail(email) || !isValidPassword(password)}
                     className="w-full flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 disabled:bg-orange-500/50 disabled:cursor-not-allowed text-white font-semibold py-3.5 rounded-xl transition-all cursor-pointer"
                   >
                     {isSubmitting ? (

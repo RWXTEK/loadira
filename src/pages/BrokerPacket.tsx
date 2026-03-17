@@ -17,6 +17,7 @@ import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { useAuth } from '../hooks/useAuth'
 import { buildCarrierDisplay, formatCurrency } from '../lib/mockFmcsa'
+import { DataDisclaimerFooter } from '../components/FmcsaDisclaimer'
 
 function BrokerPacket() {
   const { carrier: carrierRow, loading } = useAuth()
@@ -275,6 +276,13 @@ function BrokerPacket() {
               </div>
             </PacketSection>
 
+            {/* Watermark Disclaimer */}
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-6">
+              <p className="text-xs text-amber-700 font-medium text-center">
+                FOR INFORMATIONAL PURPOSES ONLY — Verify all data independently before making business, lending, or compliance decisions. Loadira does not guarantee the accuracy of FMCSA or carrier-submitted data.
+              </p>
+            </div>
+
             {/* Footer */}
             <div className="border-t border-gray-200 pt-6 flex items-center justify-between text-xs text-gray-400">
               <div className="flex items-center gap-2">
@@ -284,6 +292,8 @@ function BrokerPacket() {
             </div>
           </div>
         </div>
+
+        <DataDisclaimerFooter />
       </main>
 
       <Footer />
