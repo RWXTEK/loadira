@@ -12,6 +12,7 @@ import Terms from './pages/Terms'
 import Privacy from './pages/Privacy'
 import CookiePolicy from './pages/CookiePolicy'
 import DataRequest from './pages/DataRequest'
+import Security from './pages/Security'
 import ProtectedRoute from './components/ProtectedRoute'
 import ErrorBoundary from './components/ErrorBoundary'
 import CookieConsent from './components/CookieConsent'
@@ -53,6 +54,7 @@ function App() {
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/cookie-policy" element={<CookiePolicy />} />
         <Route path="/data-request" element={<DataRequest />} />
+        <Route path="/security" element={<Security />} />
         <Route path="/profile/:slug" element={<Profile />} />
         <Route
           path="/dashboard"

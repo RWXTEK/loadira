@@ -260,6 +260,30 @@ function Pricing() {
               </div>
             ))}
           </div>
+        {/* Enterprise Security */}
+        <div className="mt-16 max-w-4xl mx-auto">
+          <h3 className="text-xl font-bold text-center mb-6">Enterprise Security — Included in Every Plan</h3>
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4">
+            {[
+              { icon: 'shield', label: '3-Tier Data Privacy', desc: 'Public, broker-verified, and private access levels' },
+              { icon: 'lock', label: 'Insurance Never Public', desc: 'COI and policy data never on any public URL' },
+              { icon: 'clock', label: 'Broker Access Logging', desc: 'Every profile view logged with MC number and timestamp' },
+              { icon: 'shield', label: 'GDPR & CCPA Compliant', desc: 'Full data rights: access, delete, export, opt-out' },
+              { icon: 'lock', label: 'AES-256 Encryption', desc: 'Data encrypted at rest and in transit (TLS 1.3)' },
+              { icon: 'check', label: 'Enterprise Infrastructure', desc: 'Netlify CDN + Supabase PostgreSQL with RLS' },
+            ].map((item) => (
+              <div key={item.label} className="bg-gray-900 border border-gray-800 rounded-xl p-4 text-center">
+                <TrustIcon type={item.icon} />
+                <p className="text-sm text-white font-medium mt-2">{item.label}</p>
+                <p className="text-xs text-gray-500 mt-1">{item.desc}</p>
+              </div>
+            ))}
+          </div>
+          <p className="text-center mt-4">
+            <a href="/security" className="text-xs text-amber-400 hover:text-amber-300">Learn more about our security practices</a>
+          </p>
+        </div>
+
         {/* Legal Disclaimer */}
         <div className="mt-12 max-w-2xl mx-auto text-center">
           <p className="text-xs text-gray-600 leading-relaxed">

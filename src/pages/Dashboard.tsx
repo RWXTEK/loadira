@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Globe,
@@ -20,7 +21,10 @@ import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import BillingCard from '../components/BillingCard'
 import { useAuth } from '../hooks/useAuth'
+import { supabase } from '../lib/supabase'
 import { buildCarrierDisplay, getSafetyRatingColor, formatCurrency } from '../lib/mockFmcsa'
+import type { CarrierData } from '../lib/mockFmcsa'
+import type { Carrier } from '../hooks/useAuth'
 import { DataDisclaimerFooter } from '../components/FmcsaDisclaimer'
 
 function Dashboard() {
@@ -164,9 +168,10 @@ function Dashboard() {
           </div>
         </div>
 
-        {/* Billing */}
-        <div className="mb-8">
+        {/* Billing + Trust Score */}
+        <div className="grid lg:grid-cols-2 gap-6 mb-8">
           <BillingCard />
+          <TrustScoreCard carrier={carrier} carrierRow={carrierRow} />
         </div>
 
         {/* Quick Actions */}
@@ -232,6 +237,71 @@ function Dashboard() {
       </main>
 
       <Footer />
+    </div>
+  )
+}
+
+function TrustScoreCard({ carrier, carrierRow }: { carrier: CarrierData; carrierRow: Carrier | null }) {
+  const [brokerViews, setBrokerViews] = useState(0)
+
+  useEffect(() => {
+    if (!carrierRow?.id) return
+    supabase.from('access_log')
+      .select('id', { count: 'exact', head: true })
+      .eq('carrier_id', carrierRow.id)
+      .eq('access_tier', 'broker')
+      .gte('created_at', new Date(Date.now() - 30 * 86400000).toISOString())
+      .then(({ count }) => setBrokerViews(count || 0))
+  }, [carrierRow?.id])
+
+  // Calculate completeness
+  const fields = [
+    !!carrier.legalName,
+    !!carrier.phone,
+    !!carrier.email,
+    !!carrier.address.street,
+    !!carrier.companyDescription,
+    Object.values(carrier.equipment).some(v => v > 0),
+    carrier.serviceLanes.length > 0,
+    carrier.cargoCarried.length > 0,
+    !!carrier.safetyRating && carrier.safetyRating !== 'Not Rated',
+    !!carrierRow?.logo_url,
+  ]
+  const completeness = Math.round((fields.filter(Boolean).length / fields.length) * 100)
+
+  return (
+    <div className="bg-gray-900/50 border border-gray-800 rounded-2xl p-6">
+      <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+        <ShieldCheck className="w-5 h-5 text-amber-400" />
+        Profile Trust Score
+      </h2>
+      <div className="space-y-4">
+        {/* Completeness */}
+        <div>
+          <div className="flex justify-between text-sm mb-1.5">
+            <span className="text-gray-400">Profile Completeness</span>
+            <span className={`font-bold ${completeness >= 80 ? 'text-emerald-400' : completeness >= 50 ? 'text-amber-400' : 'text-red-400'}`}>{completeness}%</span>
+          </div>
+          <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
+            <div className={`h-full rounded-full transition-all ${completeness >= 80 ? 'bg-emerald-500' : completeness >= 50 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${completeness}%` }} />
+          </div>
+        </div>
+        {/* Stats */}
+        <div className="grid grid-cols-3 gap-3 pt-2">
+          <div className="text-center">
+            <p className="text-xl font-bold text-white">{brokerViews}</p>
+            <p className="text-[11px] text-gray-500">Broker Views<br />This Month</p>
+          </div>
+          <div className="text-center">
+            <p className="text-xl font-bold text-emerald-400">{carrier.mcNumber ? 'Yes' : 'No'}</p>
+            <p className="text-[11px] text-gray-500">FMCSA<br />Verified</p>
+          </div>
+          <div className="text-center">
+            <p className="text-xl font-bold text-white">{completeness >= 80 ? 'High' : completeness >= 50 ? 'Medium' : 'Low'}</p>
+            <p className="text-[11px] text-gray-500">Trust<br />Level</p>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

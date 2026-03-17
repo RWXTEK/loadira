@@ -30,6 +30,7 @@ function Footer() {
               <FooterLink to="/terms">Terms of Service</FooterLink>
               <FooterLink to="/privacy">Privacy Policy</FooterLink>
               <FooterLink to="/cookie-policy">Cookie Policy</FooterLink>
+              <FooterLink to="/security">Security</FooterLink>
               <FooterLink to="/data-request">Do Not Sell My Info</FooterLink>
             </ul>
           </div>

@@ -14,7 +14,6 @@ import {
   Calendar,
   Loader2,
   Lock,
-  Eye,
 } from 'lucide-react'
 import Footer from '../components/Footer'
 import { supabase } from '../lib/supabase'
@@ -39,6 +38,7 @@ function Profile({ subdomainSlug, customDomain }: { subdomainSlug?: string; cust
   const [brokerMc, setBrokerMc] = useState('')
   const [brokerVerifying, setBrokerVerifying] = useState(false)
   const [brokerError, setBrokerError] = useState('')
+  const [brokerUnlockTime, setBrokerUnlockTime] = useState('')
 
   useEffect(() => {
     async function fetchCarrier() {
@@ -98,6 +98,7 @@ function Profile({ subdomainSlug, customDomain }: { subdomainSlug?: string; cust
     }).then(() => {})
 
     setAccessTier('broker')
+    setBrokerUnlockTime(new Date().toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }))
     setBrokerVerifying(false)
   }
 
@@ -154,12 +155,17 @@ function Profile({ subdomainSlug, customDomain }: { subdomainSlug?: string; cust
 
       <FmcsaBanner />
 
-      {/* Access tier indicator */}
+      {/* Access tier indicator + broker confirmation */}
       {isBroker && (
         <div className="bg-emerald-500/10 border-b border-emerald-500/20">
-          <div className="max-w-7xl mx-auto px-6 py-2 flex items-center gap-2 text-xs text-emerald-400">
-            <Eye className="w-3.5 h-3.5" />
-            <span>Verified broker view — additional carrier details are visible</span>
+          <div className="max-w-7xl mx-auto px-6 py-3">
+            <div className="flex items-center gap-2 text-xs text-emerald-400 mb-1">
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span className="font-medium">Verified Broker Access — MC-{brokerMc}</span>
+            </div>
+            <p className="text-[11px] text-emerald-400/60">
+              Viewing {carrier.legalName} &middot; {brokerUnlockTime} &middot; This access has been logged for carrier security
+            </p>
           </div>
         </div>
       )}
@@ -192,10 +198,20 @@ function Profile({ subdomainSlug, customDomain }: { subdomainSlug?: string; cust
                 )}
               </div>
             </div>
-            <div className="flex flex-col items-start md:items-end gap-2 text-sm text-gray-400">
-              <span className="font-mono">{carrier.mcNumber}</span>
-              <span className="font-mono">DOT {carrier.dotNumber}</span>
-              <span>{carrier.operatingStatus}</span>
+            <div className="flex flex-col items-start md:items-end gap-3">
+              <div className="text-sm text-gray-400 space-y-1 text-right">
+                <p className="font-mono">{carrier.mcNumber}</p>
+                <p className="font-mono">DOT {carrier.dotNumber}</p>
+                <p>{carrier.operatingStatus}</p>
+              </div>
+              {/* FMCSA Verified Trust Badge */}
+              <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-2">
+                <ShieldCheck className="w-5 h-5 text-amber-400" />
+                <div>
+                  <p className="text-xs font-bold text-amber-300 leading-tight">FMCSA VERIFIED</p>
+                  <p className="text-[10px] text-amber-400/60">by Loadira</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
