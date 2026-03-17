@@ -9,7 +9,7 @@ function Terms() {
 
       <main className="flex-1 max-w-3xl mx-auto w-full px-6 py-16">
         <h1 className="text-4xl font-bold mb-2">Terms of Service</h1>
-        <p className="text-gray-400 mb-10">Last updated: March 15, 2026</p>
+        <p className="text-gray-400 mb-10">Last updated: March 16, 2026</p>
 
         <div className="prose prose-invert prose-gray max-w-none space-y-8 text-gray-300 text-sm leading-relaxed">
           <Section title="1. Agreement to Terms">

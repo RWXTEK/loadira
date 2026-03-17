@@ -21,9 +21,9 @@ function Navbar() {
   }
 
   return (
-    <nav className="border-b border-gray-800/50 bg-gray-950/80 backdrop-blur-md sticky top-0 z-50">
+    <nav className="border-b border-gray-800/50 bg-gray-950/80 backdrop-blur-md sticky top-0 z-50" role="navigation" aria-label="Main navigation">
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-        <Link to={authenticated ? '/dashboard' : '/'} className="flex items-center gap-2">
+        <Link to={authenticated ? '/dashboard' : '/'} className="flex items-center gap-2" aria-label="Loadira home">
           <LoadiraLogo size="md" />
         </Link>
 
@@ -65,6 +65,8 @@ function Navbar() {
         <button
           className="md:hidden text-gray-400 hover:text-white cursor-pointer"
           onClick={() => setMobileOpen(!mobileOpen)}
+          aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
+          aria-expanded={mobileOpen}
         >
           {mobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
         </button>

@@ -10,8 +10,11 @@ import Settings from './pages/Settings'
 import ResetPassword from './pages/ResetPassword'
 import Terms from './pages/Terms'
 import Privacy from './pages/Privacy'
+import CookiePolicy from './pages/CookiePolicy'
+import DataRequest from './pages/DataRequest'
 import ProtectedRoute from './components/ProtectedRoute'
 import ErrorBoundary from './components/ErrorBoundary'
+import CookieConsent from './components/CookieConsent'
 
 function App() {
   return (
@@ -24,6 +27,8 @@ function App() {
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/terms" element={<Terms />} />
         <Route path="/privacy" element={<Privacy />} />
+        <Route path="/cookie-policy" element={<CookiePolicy />} />
+        <Route path="/data-request" element={<DataRequest />} />
         <Route path="/profile/:slug" element={<Profile />} />
         <Route
           path="/dashboard"
@@ -50,6 +55,7 @@ function App() {
           }
         />
       </Routes>
+      <CookieConsent />
     </ErrorBoundary>
   )
 }

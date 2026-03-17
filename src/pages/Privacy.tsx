@@ -9,7 +9,7 @@ function Privacy() {
 
       <main className="flex-1 max-w-3xl mx-auto w-full px-6 py-16">
         <h1 className="text-4xl font-bold mb-2">Privacy Policy</h1>
-        <p className="text-gray-400 mb-10">Last updated: March 15, 2026</p>
+        <p className="text-gray-400 mb-10">Last updated: March 16, 2026</p>
 
         <div className="prose prose-invert prose-gray max-w-none space-y-8 text-gray-300 text-sm leading-relaxed">
           <Section title="1. Introduction">
@@ -140,13 +140,40 @@ function Privacy() {
             </p>
           </Section>
 
-          <Section title="12. Changes to This Policy">
+          <Section title="12. Canadian Privacy (PIPEDA)">
+            <p>
+              If you are a Canadian resident, the Personal Information Protection and Electronic Documents Act (PIPEDA) governs our collection, use, and disclosure of your personal information. Under PIPEDA, you have the right to: (a) access your personal information held by us; (b) challenge the accuracy and completeness of your information and have it amended; (c) withdraw consent for certain uses of your data; (d) file a complaint with the Office of the Privacy Commissioner of Canada.
+            </p>
+            <p>
+              We collect, use, and disclose personal information only for purposes that a reasonable person would consider appropriate. To exercise your PIPEDA rights, email <span className="text-amber-400">customertek@rwxtek.com</span> or use our <Link to="/data-request" className="text-amber-400 hover:text-amber-300">Data Request Form</Link>.
+            </p>
+          </Section>
+
+          <Section title="13. International Users (GDPR / UK GDPR)">
+            <p>
+              If you are located in the European Economic Area (EEA) or United Kingdom, the General Data Protection Regulation (GDPR) or UK GDPR applies. Our legal basis for processing your data is: (a) contract performance (providing the Service); (b) legitimate interest (security, fraud prevention); (c) consent (where explicitly given).
+            </p>
+            <p>
+              Your additional rights under GDPR include: right to restriction of processing (Art. 18), right to data portability (Art. 20), right to object to processing (Art. 21), and the right to lodge a complaint with your local Data Protection Authority.
+            </p>
+            <p>
+              Data is transferred to and processed in the United States. By using the Service, you consent to this transfer. We rely on Standard Contractual Clauses (SCCs) where applicable.
+            </p>
+          </Section>
+
+          <Section title="14. Age-Appropriate Design (California AB 2273)">
+            <p>
+              Loadira is designed for adults (18+) operating motor carrier businesses. We do not knowingly collect data from users under 18. We do not profile minors, use dark patterns to encourage data sharing, or use personal information in ways that are detrimental to children or teens. Users under 13 are strictly prohibited from using this Service under COPPA.
+            </p>
+          </Section>
+
+          <Section title="15. Changes to This Policy">
             <p>
               We may update this Privacy Policy from time to time. Changes become effective upon posting. We will notify you of material changes via email or a prominent notice on the Service. Your continued use after changes constitutes acceptance.
             </p>
           </Section>
 
-          <Section title="13. Contact">
+          <Section title="16. Contact">
             <p>
               For questions about this Privacy Policy or our data practices, contact us at:
             </p>
@@ -156,9 +183,9 @@ function Privacy() {
             </p>
           </Section>
 
-          <div className="pt-6 border-t border-gray-800">
+          <div className="pt-6 border-t border-gray-800 space-y-2">
             <p className="text-gray-500">
-              See also: <Link to="/terms" className="text-amber-400 hover:text-amber-300">Terms of Service</Link>
+              See also: <Link to="/terms" className="text-amber-400 hover:text-amber-300">Terms of Service</Link> | <Link to="/cookie-policy" className="text-amber-400 hover:text-amber-300">Cookie Policy</Link> | <Link to="/data-request" className="text-amber-400 hover:text-amber-300">Data Rights Request</Link>
             </p>
           </div>
         </div>

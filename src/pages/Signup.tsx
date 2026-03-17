@@ -65,6 +65,11 @@ function Signup() {
     e.preventDefault()
     if (!agreedToTerms || !confirmedAge || !fmcsaResult) return
 
+    if (!confirmedAge) {
+      setSignupError('You must be at least 18 years old to use this service. Users under 13 are prohibited under COPPA.')
+      return
+    }
+
     // Validate inputs
     const cleanName = sanitizeText(fullName, 100)
     const cleanEmail = email.trim()
