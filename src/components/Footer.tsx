@@ -52,6 +52,9 @@ function Footer() {
             FMCSA data sourced from the QCMobile API. Not affiliated with the U.S. Department of Transportation.
           </p>
         </div>
+        <p className="text-xs text-gray-600 text-center mt-6">
+          Loadira is a product of RWX-TEK INC. — a California Corporation
+        </p>
       </div>
     </footer>
   )
