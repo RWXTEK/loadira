@@ -13,7 +13,9 @@ import Privacy from './pages/Privacy'
 import CookiePolicy from './pages/CookiePolicy'
 import DataRequest from './pages/DataRequest'
 import Security from './pages/Security'
+import Admin from './pages/Admin'
 import ProtectedRoute from './components/ProtectedRoute'
+import AdminRoute from './components/AdminRoute'
 import ErrorBoundary from './components/ErrorBoundary'
 import CookieConsent from './components/CookieConsent'
 import { useDomainContext } from './hooks/useDomainContext'
@@ -78,6 +80,14 @@ function App() {
             <ProtectedRoute>
               <Settings />
             </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <AdminRoute>
+              <Admin />
+            </AdminRoute>
           }
         />
       </Routes>
