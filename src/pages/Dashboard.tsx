@@ -58,15 +58,13 @@ function Dashboard() {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <a
-              href={carrier.websiteSlug ? `https://${carrier.websiteSlug}.loadira.com` : `/profile/${carrier.websiteSlug}`}
-              target="_blank"
-              rel="noopener noreferrer"
+            <Link
+              to={`/profile/${carrier.websiteSlug}`}
               className="flex items-center gap-2 text-sm bg-gray-800 hover:bg-gray-700 border border-gray-700 text-white px-4 py-2.5 rounded-lg transition-colors"
             >
               <Eye className="w-4 h-4" />
               View Public Site
-            </a>
+            </Link>
             <Link
               to="/settings"
               className="flex items-center gap-2 text-sm bg-orange-500 hover:bg-orange-600 text-white px-4 py-2.5 rounded-lg font-medium transition-colors"

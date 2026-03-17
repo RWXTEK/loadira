@@ -123,7 +123,7 @@ function Settings() {
   const [copied, setCopied] = useState(false)
   const { hasFeature } = useSubscription()
   const canUseCustomDomain = hasFeature('customDomain')
-  const subdomainUrl = carrier?.website_slug ? `${carrier.website_slug}.loadira.com` : ''
+  const profileUrl = carrier?.website_slug ? `loadira.com/profile/${carrier.website_slug}` : ''
 
   // Documents from DB
   const [documents, setDocuments] = useState<DocRow[]>([])
@@ -326,8 +326,8 @@ function Settings() {
     setServiceLanes(serviceLanes.filter((_, i) => i !== index))
   }
 
-  const copySubdomain = () => {
-    navigator.clipboard.writeText(`https://${subdomainUrl}`)
+  const copyProfileUrl = () => {
+    navigator.clipboard.writeText(`https://${profileUrl}`)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
@@ -465,28 +465,26 @@ function Settings() {
 
         <div className="space-y-8">
           {/* Domain Management */}
-          <SettingsSection icon={<Globe className="w-5 h-5" />} title="Domain & URL" description="Your carrier website address. Share with brokers and shippers.">
-            {/* Subdomain (always available) */}
+          <SettingsSection icon={<Globe className="w-5 h-5" />} title="Your Carrier URL" description="Share this link with brokers, shippers, and on load boards.">
+            {/* Profile URL */}
             <div className="mb-5">
-              <label className="block text-xs text-gray-400 mb-1.5 font-medium">Your Loadira Subdomain</label>
+              <label className="block text-xs text-gray-400 mb-1.5 font-medium">Your Public Profile Link</label>
               <div className="flex items-center gap-2">
-                <div className="flex-1 flex items-center bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm">
+                <div className="flex-1 flex items-center bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-sm">
                   <LinkIcon className="w-4 h-4 text-gray-500 mr-2 flex-shrink-0" />
-                  <span className="text-amber-400 font-medium truncate">{subdomainUrl || 'your-carrier.loadira.com'}</span>
+                  <span className="text-amber-400 font-medium truncate">{profileUrl}</span>
                 </div>
-                <button onClick={copySubdomain} disabled={!subdomainUrl} className="flex items-center gap-1.5 text-sm bg-gray-800 hover:bg-gray-700 border border-gray-700 text-white px-3 py-2.5 rounded-xl transition-colors cursor-pointer disabled:opacity-50" aria-label="Copy subdomain URL">
-                  {copied ? <CheckCircle className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                <button onClick={copyProfileUrl} className="flex items-center gap-1.5 text-sm bg-amber-500 hover:bg-amber-400 text-gray-950 font-semibold px-4 py-3 rounded-xl transition-colors cursor-pointer" aria-label="Copy profile URL">
+                  {copied ? <><CheckCircle className="w-4 h-4" /> Copied</> : <><Copy className="w-4 h-4" /> Copy</>}
                 </button>
-                {subdomainUrl && (
-                  <a href={`https://${subdomainUrl}`} target="_blank" rel="noopener noreferrer" className="flex items-center text-sm bg-gray-800 hover:bg-gray-700 border border-gray-700 text-white px-3 py-2.5 rounded-xl transition-colors" aria-label="Open subdomain">
-                    <ExternalLink className="w-4 h-4" />
-                  </a>
-                )}
+                <a href={`https://${profileUrl}`} target="_blank" rel="noopener noreferrer" className="flex items-center text-sm bg-gray-800 hover:bg-gray-700 border border-gray-700 text-white px-3 py-3 rounded-xl transition-colors" aria-label="Open profile in new tab">
+                  <ExternalLink className="w-4 h-4" />
+                </a>
               </div>
-              <p className="text-xs text-gray-500 mt-1.5">This is always active. Anyone can view your carrier profile at this address.</p>
+              <p className="text-xs text-gray-500 mt-2">This is your live carrier website. Share it on DAT, Truckstop, broker applications, and email signatures.</p>
             </div>
 
-            {/* Custom Domain (paid plans) */}
+            {/* Custom Domain (paid plans — hidden until available) */}
             <div className="pt-5 border-t border-gray-800">
               <div className="flex items-center justify-between mb-3">
                 <label className="block text-xs text-gray-400 font-medium">Custom Domain</label>
