@@ -505,7 +505,8 @@ function QuoteForm({ carrierId }: { carrierId: string }) {
         email: cleanEmail,
         details: cleanDetails,
       } as Record<string, unknown>)
-      cd C:\Users\Tony\Documents\carriershield; try { await fetch('/.netlify/functions/send-quote-
+      await supabase.from('quote_requests').insert(sanitizedData).catch(() => {})
+      try { await fetch('/.netlify/functions/send-quote-notification', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: cleanName, email: cleanEmail, details: cleanDetails }) }) } catch {}
     }
 
     setIsLoading(false)
