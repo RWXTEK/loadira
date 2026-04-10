@@ -1,5 +1,5 @@
 -- ============================================================
--- CarrierShield: Stripe Subscriptions Schema
+-- Loadira: Stripe Subscriptions Schema
 -- Run in: Supabase SQL Editor
 -- ============================================================
 

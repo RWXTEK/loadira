@@ -505,7 +505,7 @@ function QuoteForm({ carrierId }: { carrierId: string }) {
         email: cleanEmail,
         details: cleanDetails,
       } as Record<string, unknown>)
-      await supabase.from('quote_requests').insert(sanitizedData)
+      await supabase.from('quote_requests').insert(sanitizedData); try { await fetch('/.netlify/functions/send-quote-notification', {
     }
 
     setIsLoading(false)

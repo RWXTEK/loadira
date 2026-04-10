@@ -116,7 +116,7 @@ export default function BillingCard() {
         <div>
           <p className="text-gray-500 text-xs uppercase tracking-wider mb-1">Current Plan</p>
           <h3 className="text-white text-2xl font-black">
-            CarrierShield {PLAN_NAMES[subscription.plan_id] || subscription.plan_id}
+            Loadira {PLAN_NAMES[subscription.plan_id] || subscription.plan_id}
           </h3>
         </div>
         <span
